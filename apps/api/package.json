@@ -16,6 +16,7 @@
     "seed": "tsx prisma/seed.ts",
     "search:reindex": "tsx src/scripts/reindex-search.ts",
     "catalog:import": "tsx src/scripts/import-catalog.ts",
+    "catalog:pdf-to-csv": "tsx src/scripts/pdf-to-csv.ts",
     "user:role": "tsx src/scripts/set-role.ts",
     "data:retention": "tsx src/scripts/data-retention.ts"
   },
@@ -36,6 +37,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "tsx": "^4.19.2",
+    "unpdf": "^1.8.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
