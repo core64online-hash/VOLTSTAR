@@ -110,10 +110,31 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # DEPLOY_PAT (scope `workflow`) потрібен лише для відкату: GITHUB_TOKEN не має права
+          # змінювати файли в .github/workflows, тож повернути гілку на старий коміт, у якому
+          # цей файл інший, він не може. Без PAT решта кроків працює як раніше.
+          token: ${{ secrets.DEPLOY_PAT || github.token }}
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           package-manager-cache: false
+      # Перевірка до будь-яких записів: якщо секретів немає, деплой усе одно впаде, але вже
+      # після переміщення гілки — і `production` вказувала б на коміт, якого на сервері немає.
+      - name: Чи налаштовано доступ до Coolify
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_PRODUCTION_UUID: ${{ secrets.COOLIFY_PRODUCTION_UUID }}
+        run: |
+          missing=""
+          [ -n "$COOLIFY_URL" ] || missing="$missing COOLIFY_URL"
+          [ -n "$COOLIFY_TOKEN" ] || missing="$missing COOLIFY_TOKEN"
+          [ -n "$COOLIFY_PRODUCTION_UUID" ] || missing="$missing COOLIFY_PRODUCTION_UUID"
+          # Не `[ … ] && exit 0`: під `bash -e` хибна перевірка обірвала б крок ще до підказки.
+          if [ -n "$missing" ]; then
+            echo "::error::Не задано секрети environment «production»:$missing. Гілку production не чіпали, стан сервера не змінився. Settings → Environments → production → Environment secrets (див. docs/RUNBOOK.md §2)."
+            exit 1
+          fi
       - name: Запамʼятати поточну версію production (для відкату)
         id: prev
         run: echo "sha=$(git rev-parse --verify -q origin/production || echo '')" >> "$GITHUB_OUTPUT"
@@ -131,8 +152,13 @@ jobs:
       - name: Відкат на попередню версію
         if: failure() && steps.prev.outputs.sha != ''
         run: |
-          echo "::error::Smoke-тести не пройдено — відкат на ${{ steps.prev.outputs.sha }}"
-          git push origin "${{ steps.prev.outputs.sha }}:refs/heads/production" --force
+          echo "::error::Деплой production не вдався — відкат на ${{ steps.prev.outputs.sha }}"
+          # Якщо між версіями змінювався сам workflow, GITHUB_TOKEN цей push не пропустить
+          # (права `workflow` він не має) — тоді кажемо, що зробити руками, а не мовчимо.
+          if ! git push origin "${{ steps.prev.outputs.sha }}:refs/heads/production" --force; then
+            echo "::error::Відкат не пройшов: GitHub не дозволив змінити .github/workflows без права «workflow». Поверніть версію вручну — у Coolify (ресурс production → Deployments → попередня збірка) або додайте секрет DEPLOY_PAT із цим правом. Сервер зараз на ${{ steps.prev.outputs.sha }}, гілка production — на новому коміті."
+            exit 1
+          fi
           node scripts/coolify-deploy.mjs "${{ secrets.COOLIFY_PRODUCTION_UUID }}"
           node scripts/smoke.mjs "${{ vars.PRODUCTION_URL || inputs.production_url }}" --version "${{ steps.prev.outputs.sha }}" --retries 100
         env:
