@@ -16,6 +16,8 @@ export type LeadStatus = (typeof LeadStatus)[keyof typeof LeadStatus];
 export const LeadSource = {
   /** Пошук по крос-номеру не дав результату — клієнт залишив номер. */
   PART_REQUEST: 'part-request',
+  /** Товар є в каталозі, але ціни на нього ще немає — клієнт просить назвати. */
+  PRICE_REQUEST: 'price-request',
   /** Заявка на відновлення свого агрегата. */
   REMAN: 'reman',
   B2B_REQUEST: 'b2b-request',

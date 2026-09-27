@@ -50,6 +50,7 @@ type LeadRow = Prisma.LeadGetPayload<{ include: typeof leadInclude }>;
 
 const SOURCE_LABEL: Record<string, string> = {
   'part-request': 'підбір по номеру',
+  'price-request': 'запит ціни',
   reman: 'відновлення агрегата',
   'b2b-request': 'запит B2B',
   'b2g-request': 'запит B2G',
