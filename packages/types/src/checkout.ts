@@ -43,6 +43,14 @@ export const CartLineSchema = z.object({
   productId: z.string(),
   slug: z.string(),
   name: z.string(),
+  /** Артикул: клієнт звіряє саме його, і він же лишається в рахунку. */
+  partNumber: z.string(),
+  /**
+   * Застава за старий агрегат при купівлі на обмін, копійки за одиницю.
+   * У суму замовлення не входить: її вносять при отриманні, якщо старий агрегат не здано,
+   * і повертають, коли здано. Тому показуємо її окремо, а не в ціні.
+   */
+  coreDepositMinor: z.number().int().nonnegative().optional(),
   quantity: z.number().int().positive(),
   unitGrossMinor: z.number().int().nonnegative(),
   vatRate: z.number().min(0).max(1),

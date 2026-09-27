@@ -100,13 +100,28 @@ if (slug) {
     slug,
   );
 }
-const presetsRes = await get('/api/catalog/equipment-presets');
-const presets = presetsRes.ok ? await presetsRes.json() : null;
-const labels = Array.isArray(presets) ? presets.map((p) => p.label) : [];
+// Пошук по крос-номеру — головний вхід у каталог: якщо він мовчить, сайт для клієнта мертвий,
+// навіть коли каталог віддається. Беремо номер першого ж товару, щоб не залежати від даних.
+const partNumber = products?.items?.[0]?.partNumber;
+if (partNumber) {
+  const spaced = partNumber.replace(/(.{3})/g, '$1 ').trim(); // те саме написання «через пробіли»
+  const lookupRes = await get(`/api/catalog/lookup?number=${encodeURIComponent(spaced)}`);
+  const lookup = lookupRes.ok ? await lookupRes.json() : null;
+  check(
+    'пошук по крос-номеру знаходить попри роздільники',
+    lookup?.match === 'exact' && lookup.items.some((i) => i.partNumber === partNumber),
+    `${spaced} → ${lookup?.match ?? '—'}`,
+  );
+  check(
+    'пошук по номеру кешується публічно',
+    /public/.test(lookupRes.headers.get('cache-control') ?? ''),
+  );
+}
+const missing = await get('/api/catalog/lookup?number=SMOKE0000MISSING');
+const missingBody = missing.ok ? await missing.json() : null;
 check(
-  'пресети техніки для підбору без дублікатів',
-  Array.isArray(presets) && new Set(labels).size === labels.length,
-  `${labels.length} шт.`,
+  'номера немає — порожній результат, а не випадкові товари',
+  missingBody?.match === 'none' && missingBody.items.length === 0,
 );
 check('неіснуючий товар — 404', (await get('/uk/catalog/__smoke-missing__')).status === 404);
 

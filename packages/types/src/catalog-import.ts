@@ -1,7 +1,20 @@
 import { z } from 'zod';
-import { CurrencySchema } from './enums';
-import { imageUrlField, powerWField, slugField } from './fields';
-import { FuelType, PhaseType } from './selector';
+import {
+  CurrencySchema,
+  MachineSegment,
+  PartCondition,
+  PartKind,
+  Rotation,
+} from './enums';
+import {
+  amperageField,
+  imageUrlField,
+  powerKwField,
+  slugField,
+  teethField,
+  voltageField,
+} from './fields';
+import { partNumberField } from './part-number';
 
 /**
  * Перелік із повідомленням українською: типове zod-івське «Invalid enum value» в звіті
@@ -29,7 +42,7 @@ const num = (v: unknown): unknown => {
 const decimal = (schema: z.ZodTypeAny): z.ZodEffects<z.ZodTypeAny> =>
   z.preprocess((v) => num(blank(v)), schema);
 
-/** Список через «;» — для колонки із зображеннями. */
+/** Список через «;» — для зображень, крос-номерів і техніки. */
 const list = (v: unknown): unknown =>
   typeof v === 'string'
     ? v
@@ -39,62 +52,75 @@ const list = (v: unknown): unknown =>
     : v;
 
 /**
- * Рядок файлу імпорту каталогу — один генератор. Джерело: CSV із таблиці, тож усі значення
- * приходять рядками й приводяться до типів тут. Обмеження ті самі, що в адмін-панелі
- * (`AdminProductInputSchema`), щоб імпорт не став шляхом в обхід перевірок.
+ * Рядок файлу імпорту каталогу — один агрегат (стартер, генератор, вузол чи ремкомплект).
+ * Джерело: CSV із таблиці, тож усі значення приходять рядками й приводяться до типів тут.
+ * Обмеження ті самі, що в адмін-панелі (`AdminProductInputSchema`), щоб імпорт не став
+ * шляхом в обхід перевірок.
  *
  * Ціни задаються у гривнях, як у прайсі; у БД зберігаються в копійках — переводить імпорт.
- * Характеристики товару передаються окремими колонками з префіксом `spec:` і розбираються
- * поза цією схемою (`parseSpecs` в apps/api/src/scripts/catalog-import.ts).
+ *
+ * Звʼязки «один до багатьох» ідуть окремими сімействами колонок і розбираються поза цією
+ * схемою (apps/api/src/scripts/catalog-import.ts):
+ *   `xref:BOSCH`  — крос-номери цього виробника, кілька через «;»;
+ *   `fits:TRUCK`  — техніка цієї групи, кілька через «;»;
+ *   `spec:…`      — решта характеристик.
  *
  * Необовʼязкові поля навмисно без значень за замовчуванням: відсутня колонка означає
  * «не чіпати», а не «стерти». Інакше прайс лише з цінами обнулив би склад і описи.
  */
-export const CatalogImportRowSchema = z
-  .object({
-    slug: slugField,
-    name: z.string().trim().min(2).max(200),
-    description: z.preprocess(blank, z.string().trim().max(5000).optional()),
-    /** Назва бренду як у прайсі; slug — окремою колонкою або з назви (транслітерація). */
-    brand: z.string().trim().min(1, 'brand: бренд обовʼязковий'),
-    brandSlug: z.preprocess(blank, slugField.optional()),
-    category: z.string().trim().min(1, 'category: категорія обовʼязкова'),
-    categorySlug: z.preprocess(blank, slugField.optional()),
-    fuel: ukEnum(FuelType),
-    phase: ukEnum(PhaseType),
-    /** Номінальна (робоча) потужність, Вт. */
-    ratedPowerW: decimal(powerWField),
-    /** Максимальна (пікова) потужність, Вт. */
-    maxPowerW: decimal(powerWField),
-    images: z.preprocess((v) => list(blank(v)), z.array(imageUrlField).max(20).optional()),
-    currency: z.preprocess(blank, CurrencySchema.default('UAH')),
-    /** Роздрібна ціна, грн. */
-    priceB2C: decimal(z.number().nonnegative().optional()),
-    /** Ціна для бізнесу, грн. */
-    priceB2B: decimal(z.number().nonnegative().optional()),
-    vatRate: decimal(z.number().min(0).max(1).optional()),
-    /** Залишок на складі, шт. */
-    stock: decimal(z.number().int().nonnegative().optional()),
-  })
-  .refine((r) => r.maxPowerW >= r.ratedPowerW, {
-    message: 'Пікова потужність не може бути меншою за номінальну',
-    path: ['maxPowerW'],
-  });
+export const CatalogImportRowSchema = z.object({
+  /** Наш артикул — ключ, за яким повторний імпорт оновлює товар, а не дублює. */
+  partNumber: partNumberField,
+  /** Адреса сторінки; якщо колонки немає, виводиться з артикула й бренду. */
+  slug: z.preprocess(blank, slugField.optional()),
+  name: z.string().trim().min(2).max(200),
+  description: z.preprocess(blank, z.string().trim().max(5000).optional()),
+  /** Виробник агрегата (Bosch, Iskra, АТЕ); slug — окремою колонкою або з назви. */
+  brand: z.string().trim().min(1, 'brand: бренд обовʼязковий'),
+  brandSlug: z.preprocess(blank, slugField.optional()),
+  category: z.string().trim().min(1, 'category: категорія обовʼязкова'),
+  categorySlug: z.preprocess(blank, slugField.optional()),
+  kind: ukEnum(PartKind),
+  condition: z.preprocess(blank, ukEnum(PartCondition).default('NEW')),
+  voltage: decimal(voltageField.optional()),
+  /** Потужність стартера, кВт. */
+  powerKw: decimal(powerKwField.optional()),
+  /** Струм віддачі генератора, А. */
+  amperageA: decimal(amperageField.optional()),
+  rotation: z.preprocess(blank, ukEnum(Rotation).optional()),
+  teeth: decimal(teethField.optional()),
+  /** Застава за старий агрегат при купівлі на обмін, грн. */
+  coreDeposit: decimal(z.number().nonnegative().optional()),
+  images: z.preprocess((v) => list(blank(v)), z.array(imageUrlField).max(20).optional()),
+  currency: z.preprocess(blank, CurrencySchema.default('UAH')),
+  /** Роздрібна ціна, грн. */
+  priceB2C: decimal(z.number().nonnegative().optional()),
+  /** Ціна для бізнесу, грн. */
+  priceB2B: decimal(z.number().nonnegative().optional()),
+  vatRate: decimal(z.number().min(0).max(1).optional()),
+  /** Залишок на складі, шт. */
+  stock: decimal(z.number().int().nonnegative().optional()),
+});
 export type CatalogImportRow = z.infer<typeof CatalogImportRowSchema>;
 
-/** Колонки шаблону: обовʼязкові для нового товару — перші сім. */
+/** Колонки шаблону: обовʼязкові для нового товару — перші пʼять. */
 export const CATALOG_IMPORT_COLUMNS = [
-  'slug',
+  'partNumber',
   'name',
   'brand',
   'category',
-  'fuel',
-  'phase',
-  'ratedPowerW',
-  'maxPowerW',
+  'kind',
+  'condition',
+  'slug',
   'description',
   'brandSlug',
   'categorySlug',
+  'voltage',
+  'powerKw',
+  'amperageA',
+  'rotation',
+  'teeth',
+  'coreDeposit',
   'images',
   'currency',
   'priceB2C',
@@ -102,3 +128,11 @@ export const CATALOG_IMPORT_COLUMNS = [
   'vatRate',
   'stock',
 ] as const;
+
+/** Префікси сімейств колонок для звʼязків «один до багатьох». */
+export const XREF_PREFIX = 'xref:';
+export const FITS_PREFIX = 'fits:';
+export const SPEC_PREFIX = 'spec:';
+
+/** Групи техніки в колонках `fits:` — ті самі, що в енумі, українською в шапці не приймаємо. */
+export const FITS_SEGMENTS = Object.values(MachineSegment);

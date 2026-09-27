@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { FuelType, PhaseType, type CatalogFacets, type Product } from '@voltstar/types';
+import {
+  MachineSegment,
+  PartCondition,
+  PartKind,
+  type CatalogFacets,
+  type Product,
+} from '@voltstar/types';
 import { fetchFacets, fetchProducts } from '../../../lib/api';
 import { ProductCard } from '../../../components/product-card';
 import type { Metadata } from 'next';
@@ -40,16 +46,17 @@ export default async function CatalogPage({
   const filters = {
     q: str(sp.q),
     brand: str(sp.brand),
-    fuel: str(sp.fuel),
-    phase: str(sp.phase),
-    minPowerW: str(sp.minPowerW),
-    maxPowerW: str(sp.maxPowerW),
+    kind: str(sp.kind),
+    condition: str(sp.condition),
+    machineSegment: str(sp.machineSegment),
+    machineModel: str(sp.machineModel),
+    voltage: str(sp.voltage),
     inStock: str(sp.inStock),
     perPage: '24',
   };
 
   let products: Product[] = [];
-  let facets: CatalogFacets = { brands: [], fuels: [] };
+  let facets: CatalogFacets = { brands: [], kinds: [], conditions: [], machineSegments: [] };
   try {
     const [list, f] = await Promise.all([fetchProducts(filters), fetchFacets()]);
     products = list.items;
@@ -58,7 +65,15 @@ export default async function CatalogPage({
     // API/БД недоступні — показуємо порожній стан і фільтри з енумів.
   }
 
-  const fuelOptions = facets.fuels.length ? facets.fuels : Object.values(FuelType);
+  // Порожні фасети означають, що API не відповів: показуємо повний перелік із енумів,
+  // щоб фільтри лишалися робочими.
+  const kindOptions = facets.kinds.length ? facets.kinds : Object.values(PartKind);
+  const conditionOptions = facets.conditions.length
+    ? facets.conditions
+    : Object.values(PartCondition);
+  const segmentOptions = facets.machineSegments.length
+    ? facets.machineSegments
+    : Object.values(MachineSegment);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12">
@@ -71,7 +86,7 @@ export default async function CatalogPage({
       <form
         action={`/${locale}/catalog`}
         method="get"
-        className="mb-8 grid gap-3 rounded-xl border border-neutral-200 p-4 sm:grid-cols-2 lg:grid-cols-5"
+        className="mb-8 grid gap-3 rounded-xl border border-neutral-200 p-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         <input
           type="search"
@@ -79,7 +94,8 @@ export default async function CatalogPage({
           defaultValue={filters.q ?? ''}
           placeholder={t('filters.search')}
           aria-label={t('filters.search')}
-          className="rounded border px-2 py-1 lg:col-span-2"
+          inputMode="search"
+          className="rounded border px-2 py-1 lg:col-span-3"
         />
         <select
           name="brand"
@@ -97,56 +113,69 @@ export default async function CatalogPage({
           ))}
         </select>
         <select
-          name="fuel"
-          aria-label={t('filters.fuel')}
-          defaultValue={filters.fuel ?? ''}
+          name="kind"
+          aria-label={t('filters.kind')}
+          defaultValue={filters.kind ?? ''}
           className="rounded border px-2 py-1"
         >
           <option value="">
-            {t('filters.fuel')}: {t('filters.all')}
+            {t('filters.kind')}: {t('filters.all')}
           </option>
-          {fuelOptions.map((f) => (
-            <option key={f} value={f}>
-              {t(`fuels.${f}`)}
+          {kindOptions.map((k) => (
+            <option key={k} value={k}>
+              {t(`kinds.${k}`)}
             </option>
           ))}
         </select>
         <select
-          name="phase"
-          aria-label={t('filters.phase')}
-          defaultValue={filters.phase ?? ''}
+          name="condition"
+          aria-label={t('filters.condition')}
+          defaultValue={filters.condition ?? ''}
           className="rounded border px-2 py-1"
         >
           <option value="">
-            {t('filters.phase')}: {t('filters.all')}
+            {t('filters.condition')}: {t('filters.all')}
           </option>
-          {Object.values(PhaseType).map((p) => (
-            <option key={p} value={p}>
-              {t(`phases.${p}`)}
+          {conditionOptions.map((c) => (
+            <option key={c} value={c}>
+              {t(`conditions.${c}`)}
             </option>
           ))}
         </select>
-        {/* Потужність — щоб фільтр, з яким прийшли зі сторінки підбору, не губився при «Застосувати». */}
-        <input
-          type="number"
-          name="minPowerW"
-          min="0"
-          step="100"
-          defaultValue={filters.minPowerW ?? ''}
-          placeholder={t('filters.minPower')}
-          aria-label={t('filters.minPower')}
+        <select
+          name="machineSegment"
+          aria-label={t('filters.machineSegment')}
+          defaultValue={filters.machineSegment ?? ''}
           className="rounded border px-2 py-1"
-        />
-        <input
-          type="number"
-          name="maxPowerW"
-          min="0"
-          step="100"
-          defaultValue={filters.maxPowerW ?? ''}
-          placeholder={t('filters.maxPower')}
-          aria-label={t('filters.maxPower')}
+        >
+          <option value="">
+            {t('filters.machineSegment')}: {t('filters.all')}
+          </option>
+          {segmentOptions.map((m) => (
+            <option key={m} value={m}>
+              {t(`machineSegments.${m}`)}
+            </option>
+          ))}
+        </select>
+        <select
+          name="voltage"
+          aria-label={t('filters.voltage')}
+          defaultValue={filters.voltage ?? ''}
           className="rounded border px-2 py-1"
-        />
+        >
+          <option value="">
+            {t('filters.voltage')}: {t('filters.all')}
+          </option>
+          {[12, 24, 28].map((v) => (
+            <option key={v} value={v}>
+              {v} {t('volt')}
+            </option>
+          ))}
+        </select>
+        {/* Модель техніки не показуємо списком — їх тисячі; вона приходить зі сторінки техніки. */}
+        {filters.machineModel && (
+          <input type="hidden" name="machineModel" value={filters.machineModel} />
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -156,7 +185,7 @@ export default async function CatalogPage({
           />
           {t('filters.inStock')}
         </label>
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-5">
+        <div className="flex gap-2 sm:col-span-2 lg:col-span-3">
           <button
             type="submit"
             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-black hover:bg-yellow-300"

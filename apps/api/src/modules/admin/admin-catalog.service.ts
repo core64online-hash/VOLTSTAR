@@ -1,12 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type {
-  AdminProduct,
-  AdminProductInput,
-  AdminProductUpdate,
-  CatalogRefs,
-  Page,
-  SetPriceInput,
+import {
+  normalizePartNumber,
+  type AdminProduct,
+  type AdminProductInput,
+  type AdminProductUpdate,
+  type ApplicationInput,
+  type CatalogRefs,
+  type CrossReferenceInput,
+  type Page,
+  type SetPriceInput,
 } from '@voltstar/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
@@ -17,6 +20,8 @@ const productInclude = {
   specs: { orderBy: { id: 'asc' } },
   inventory: true,
   prices: { include: { priceList: true }, orderBy: { priceList: { segment: 'asc' } } },
+  crossReferences: { orderBy: [{ brand: 'asc' }, { numberNorm: 'asc' }] },
+  applications: { include: { machineModel: { include: { brand: true } } } },
 } satisfies Prisma.ProductInclude;
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
@@ -32,15 +37,29 @@ export class AdminCatalogService {
   ) {}
 
   async refs(): Promise<CatalogRefs> {
-    const [brands, categories, priceLists] = await Promise.all([
+    const [brands, categories, machineModels, priceLists] = await Promise.all([
       this.prisma.brand.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       this.prisma.category.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.machineModel.findMany({
+        select: { id: true, name: true, segment: true, brand: { select: { name: true } } },
+        orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
+      }),
       this.prisma.priceList.findMany({
         select: { id: true, name: true, segment: true, currency: true, active: true },
         orderBy: [{ segment: 'asc' }, { currency: 'asc' }],
       }),
     ]);
-    return { brands, categories, priceLists };
+    return {
+      brands,
+      categories,
+      machineModels: machineModels.map((m) => ({
+        id: m.id,
+        name: m.name,
+        brand: m.brand.name,
+        segment: m.segment,
+      })),
+      priceLists,
+    };
   }
 
   async list(q: { q?: string; page: number; perPage: number }): Promise<Page<AdminProduct>> {
@@ -49,6 +68,8 @@ export class AdminCatalogService {
           OR: [
             { name: { contains: q.q, mode: 'insensitive' } },
             { slug: { contains: q.q, mode: 'insensitive' } },
+            { partNumberNorm: { contains: normalizePartNumber(q.q) } },
+            { crossReferences: { some: { numberNorm: { contains: normalizePartNumber(q.q) } } } },
             { brand: { name: { contains: q.q, mode: 'insensitive' } } },
           ],
         }
@@ -57,7 +78,7 @@ export class AdminCatalogService {
       this.prisma.product.findMany({
         where,
         include: productInclude,
-        orderBy: [{ brand: { name: 'asc' } }, { ratedPowerW: 'asc' }],
+        orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
         skip: (q.page - 1) * q.perPage,
         take: q.perPage,
       }),
@@ -72,13 +93,17 @@ export class AdminCatalogService {
 
   async create(input: AdminProductInput): Promise<AdminProduct> {
     await this.assertRefs(input.brandId, input.categoryId);
-    const { specs, stock, ...fields } = input;
+    await this.assertMachineModels(input.applications);
+    const { specs, stock, crossReferences, applications, ...fields } = input;
     const product = await this.unique(() =>
       this.prisma.product.create({
         data: {
           ...fields,
+          partNumberNorm: normalizePartNumber(fields.partNumber),
           description: fields.description || null,
           specs: { create: specs },
+          crossReferences: { create: toCrossReferenceRows(crossReferences) },
+          applications: { create: applications },
           inventory: { create: { quantity: stock } },
         },
       }),
@@ -87,18 +112,35 @@ export class AdminCatalogService {
   }
 
   async update(id: string, input: AdminProductUpdate): Promise<AdminProduct> {
-    const current = await this.load(id);
-    const rated = input.ratedPowerW ?? current.ratedPowerW;
-    const max = input.maxPowerW ?? current.maxPowerW;
-    if (max < rated) throw new BadRequestException('Пікова потужність не може бути меншою за номінальну');
+    await this.load(id);
     await this.assertRefs(input.brandId, input.categoryId);
-    const { specs, ...fields } = input;
+    await this.assertMachineModels(input.applications);
+    const { specs, crossReferences, applications, ...fields } = input;
     await this.unique(() =>
       this.prisma.$transaction(async (tx) => {
-        await tx.product.update({ where: { id }, data: fields });
+        await tx.product.update({
+          where: { id },
+          data: {
+            ...fields,
+            // Нормалізована форма — похідна від артикула, ніколи не задається окремо.
+            ...(fields.partNumber ? { partNumberNorm: normalizePartNumber(fields.partNumber) } : {}),
+          },
+        });
         if (specs) {
           await tx.productSpec.deleteMany({ where: { productId: id } });
           await tx.productSpec.createMany({ data: specs.map((s) => ({ ...s, productId: id })) });
+        }
+        if (crossReferences) {
+          await tx.crossReference.deleteMany({ where: { productId: id } });
+          await tx.crossReference.createMany({
+            data: toCrossReferenceRows(crossReferences).map((x) => ({ ...x, productId: id })),
+          });
+        }
+        if (applications) {
+          await tx.productApplication.deleteMany({ where: { productId: id } });
+          await tx.productApplication.createMany({
+            data: applications.map((a) => ({ ...a, productId: id })),
+          });
         }
       }),
     );
@@ -154,17 +196,45 @@ export class AdminCatalogService {
     if (!category) throw new BadRequestException('Категорію не знайдено');
   }
 
-  /** Унікальний slug: конфлікт Prisma P2002 → 409 зі зрозумілим повідомленням. */
+  private async assertMachineModels(applications?: ApplicationInput[]): Promise<void> {
+    if (!applications?.length) return;
+    const ids = [...new Set(applications.map((a) => a.machineModelId))];
+    const found = await this.prisma.machineModel.count({ where: { id: { in: ids } } });
+    if (found !== ids.length) throw new BadRequestException('Модель техніки не знайдено');
+  }
+
+  /** Унікальні slug і артикул: конфлікт Prisma P2002 → 409 зі зрозумілим повідомленням. */
   private async unique<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException('Товар із таким slug уже існує');
+        const target = String((e.meta as { target?: string[] } | undefined)?.target ?? '');
+        throw new ConflictException(
+          target.includes('partNumber')
+            ? 'Товар із таким артикулом уже існує'
+            : 'Товар із таким slug уже існує',
+        );
       }
       throw e;
     }
   }
+}
+
+/**
+ * Крос-номери з форми: нормалізована форма рахується тут, дублі в межах товару схлопуються.
+ * Інакше два написання того самого номера впали б на унікальному індексі вже в базі.
+ */
+function toCrossReferenceRows(
+  input: CrossReferenceInput[],
+): { brand: string; number: string; numberNorm: string }[] {
+  const out = new Map<string, { brand: string; number: string; numberNorm: string }>();
+  for (const x of input) {
+    const brand = x.brand.trim().toUpperCase();
+    const numberNorm = normalizePartNumber(x.number);
+    out.set(`${brand}:${numberNorm}`, { brand, number: x.number.trim(), numberNorm });
+  }
+  return [...out.values()];
 }
 
 export function toAdminProduct(p: ProductRow): AdminProduct {
@@ -175,12 +245,27 @@ export function toAdminProduct(p: ProductRow): AdminProduct {
     description: p.description,
     brand: p.brand,
     category: p.category,
-    fuel: p.fuel,
-    phase: p.phase,
-    ratedPowerW: p.ratedPowerW,
-    maxPowerW: p.maxPowerW,
+    partNumber: p.partNumber,
+    kind: p.kind,
+    condition: p.condition,
+    voltage: p.voltage,
+    powerKw: p.powerKw === null ? null : Number(p.powerKw),
+    amperageA: p.amperageA,
+    rotation: p.rotation,
+    teeth: p.teeth,
+    coreDepositMinor: p.coreDepositMinor,
     images: p.images,
     specs: p.specs.map((s) => ({ key: s.key, value: s.value })),
+    crossReferences: p.crossReferences.map((x) => ({ brand: x.brand, number: x.number })),
+    applications: p.applications.map((a) => ({
+      machineModelId: a.machineModelId,
+      machineBrand: a.machineModel.brand.name,
+      machineModel: a.machineModel.name,
+      ...(a.engine === null ? {} : { engine: a.engine }),
+      ...(a.yearFrom === null ? {} : { yearFrom: a.yearFrom }),
+      ...(a.yearTo === null ? {} : { yearTo: a.yearTo }),
+      ...(a.note === null ? {} : { note: a.note }),
+    })),
     stock: p.inventory?.quantity ?? 0,
     prices: p.prices.map((pr) => ({
       priceListId: pr.priceListId,

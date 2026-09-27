@@ -1,25 +1,29 @@
 /**
  * Масовий імпорт каталогу з CSV — щоб наповнювати вітрину прайсом, а не руками по товару.
  *
- *   pnpm --filter @voltstar/api catalog:import ./generators.csv --dry-run
- *   pnpm --filter @voltstar/api catalog:import ./generators.csv
+ *   pnpm --filter @voltstar/api catalog:import ./startery.csv --dry-run
+ *   pnpm --filter @voltstar/api catalog:import ./startery.csv
  *   pnpm --filter @voltstar/api catalog:import 'https://docs.google.com/…/pub?output=csv'
  *
  * Адреса замість файлу — для терміналу Coolify: прайс ведеться в таблиці, публікується як CSV,
  * імпорт запускається одним рядком, без копіювання файлу в контейнер.
  *
- * Повторний запуск того самого файлу оновлює товари, а не дублює: ключ — колонка slug.
+ * Повторний запуск того самого файлу оновлює товари, а не дублює: ключ — колонка partNumber.
  * Колонки, яких немає в заголовку, не чіпаються (прайс лише з цінами не обнулить склад і описи).
+ * Крос-номери (`xref:`) і техніка (`fits:`) замінюються повністю, коли відповідне сімейство
+ * колонок є в заголовку: у постачальника це завжди повний перелік, а не доповнення.
  * Формат колонок — docs/RUNBOOK.md, шаблон — deploy/catalog-example.csv.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ConfigService } from '@nestjs/config';
 import type { Currency, Prisma, Segment } from '@prisma/client';
+import { FITS_PREFIX, XREF_PREFIX } from '@voltstar/types';
 import { SearchService } from '../modules/search/search.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   hasColumn,
+  hasPrefixedColumns,
   hasSpecColumns,
   prepareRows,
   toMinor,
@@ -81,8 +85,8 @@ interface WriteContext {
 
 /**
  * Один товар — одна транзакція: помилка на одному рядку не має відкочувати вже завантажені.
- * Бренд і категорія створюються за потреби, але не перейменовуються: одруківка в прайсі не
- * повинна тихо змінити назву бренду для всього каталогу.
+ * Бренд, категорія й техніка створюються за потреби, але не перейменовуються: одруківка
+ * в прайсі не повинна тихо змінити назву бренду для всього каталогу.
  */
 async function writeProduct(
   prisma: PrismaService,
@@ -104,24 +108,32 @@ async function writeProduct(
       select: { id: true },
     });
 
-    const before = await tx.product.findUnique({ where: { slug: row.slug }, select: { id: true } });
+    const before = await tx.product.findUnique({
+      where: { partNumber: row.partNumber },
+      select: { id: true },
+    });
     const fields = {
       name: row.name,
       brandId: brand.id,
       categoryId: category.id,
-      fuel: row.fuel,
-      phase: row.phase,
-      ratedPowerW: row.ratedPowerW,
-      maxPowerW: row.maxPowerW,
+      kind: row.kind,
+      condition: row.condition,
+      partNumberNorm: p.partNumberNorm,
       // undefined = поле не змінюється; так колонка, якої немає у файлі, не стирає дані.
+      voltage: row.voltage,
+      powerKw: row.powerKw,
+      amperageA: row.amperageA,
+      rotation: row.rotation,
+      teeth: row.teeth,
+      coreDepositMinor: row.coreDeposit === undefined ? undefined : toMinor(row.coreDeposit),
       description: row.description,
       images: row.images,
     } satisfies Prisma.ProductUncheckedUpdateInput;
 
     const product = await tx.product.upsert({
-      where: { slug: row.slug },
-      create: { slug: row.slug, ...fields, images: row.images ?? [] },
-      update: fields,
+      where: { partNumber: row.partNumber },
+      create: { partNumber: row.partNumber, slug: p.slug, ...fields, images: row.images ?? [] },
+      update: { slug: p.slug, ...fields },
       select: { id: true },
     });
 
@@ -130,6 +142,47 @@ async function writeProduct(
       if (p.specs.length > 0) {
         await tx.productSpec.createMany({
           data: p.specs.map((s) => ({ productId: product.id, key: s.key, value: s.value })),
+        });
+      }
+    }
+
+    if (hasPrefixedColumns(ctx.columns, XREF_PREFIX)) {
+      await tx.crossReference.deleteMany({ where: { productId: product.id } });
+      if (p.crossReferences.length > 0) {
+        await tx.crossReference.createMany({
+          data: p.crossReferences.map((x) => ({ productId: product.id, ...x })),
+        });
+      }
+    }
+
+    if (hasPrefixedColumns(ctx.columns, FITS_PREFIX)) {
+      await tx.productApplication.deleteMany({ where: { productId: product.id } });
+      for (const a of p.applications) {
+        const machineBrand = await tx.machineBrand.upsert({
+          where: { name: a.machineBrand },
+          create: { name: a.machineBrand, slug: a.machineBrandSlug },
+          update: {},
+          select: { id: true },
+        });
+        const model = await tx.machineModel.upsert({
+          where: { brandId_name: { brandId: machineBrand.id, name: a.machineModel } },
+          create: {
+            brandId: machineBrand.id,
+            name: a.machineModel,
+            slug: a.machineModelSlug,
+            segment: a.segment,
+          },
+          update: {},
+          select: { id: true },
+        });
+        await tx.productApplication.create({
+          data: {
+            productId: product.id,
+            machineModelId: model.id,
+            engine: a.engine,
+            yearFrom: a.yearFrom,
+            yearTo: a.yearTo,
+          },
         });
       }
     }
@@ -186,7 +239,7 @@ async function main(): Promise<void> {
       try {
         if (dryRun) {
           const exists = await prisma.product.findUnique({
-            where: { slug: p.row.slug },
+            where: { partNumber: p.row.partNumber },
             select: { id: true },
           });
           if (exists) updated++;
@@ -198,12 +251,14 @@ async function main(): Promise<void> {
         if (res.status === 'created') created++;
         else updated++;
       } catch (e) {
-        errors.push({ line: p.line, slug: p.row.slug, messages: [(e as Error).message] });
+        errors.push({ line: p.line, partNumber: p.row.partNumber, messages: [(e as Error).message] });
       }
     }
 
     for (const e of errors.sort((a, b) => a.line - b.line)) {
-      console.error(`❌ Рядок ${e.line}${e.slug ? ` (${e.slug})` : ''}: ${e.messages.join('; ')}`);
+      console.error(
+        `❌ Рядок ${e.line}${e.partNumber ? ` (${e.partNumber})` : ''}: ${e.messages.join('; ')}`,
+      );
     }
     console.log(
       `${dryRun ? 'Перевірка (нічого не записано)' : 'Імпорт'}: створено ${created}, оновлено ${updated}, помилок ${errors.length}`,

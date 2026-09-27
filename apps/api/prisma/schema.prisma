@@ -36,17 +36,33 @@ enum Currency {
   EUR
 }
 
-enum FuelType {
-  PETROL
-  DIESEL
-  GAS
-  DUAL_FUEL
-  INVERTER
+// Що саме продаємо: агрегат у зборі, його вузол чи ремкомплект.
+enum PartKind {
+  STARTER
+  ALTERNATOR
+  COMPONENT
+  REPAIR_KIT
 }
 
-enum PhaseType {
-  SINGLE
-  THREE
+// Стан агрегата. EXCHANGE — відновлений в обмін на старий (з заставою за обмінний фонд).
+enum PartCondition {
+  NEW
+  REMANUFACTURED
+  EXCHANGE
+}
+
+// Напрямок обертання (з боку привода).
+enum Rotation {
+  CW
+  CCW
+}
+
+// Групи техніки, які обслуговує компанія.
+enum MachineSegment {
+  TRUCK
+  CONSTRUCTION
+  AGRICULTURAL
+  MILITARY
 }
 
 enum OrderStatus {
@@ -176,31 +192,64 @@ model Category {
 }
 
 model Product {
-  id          String    @id @default(cuid())
-  slug        String    @unique
+  id          String        @id @default(cuid())
+  slug        String        @unique
   name        String
   description String?
   brandId     String
-  brand       Brand     @relation(fields: [brandId], references: [id])
+  brand       Brand         @relation(fields: [brandId], references: [id])
   categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id])
-  fuel        FuelType
-  phase       PhaseType
-  ratedPowerW Int       // номінальна потужність, Вт
-  maxPowerW   Int       // пікова потужність, Вт
-  images      String[]  @default([])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  category    Category      @relation(fields: [categoryId], references: [id])
+  kind        PartKind
+  condition   PartCondition @default(NEW)
+  /// Наш артикул, як у прайсі.
+  partNumber  String        @unique
+  /// Той самий артикул у пошуковій формі: верхній регістр, лише [A-Z0-9].
+  partNumberNorm String     @unique
+  /// Напруга, В (12/24/28). Довідкова характеристика, підбір іде по крос-номеру.
+  voltage     Int?
+  /// Потужність стартера, кВт.
+  powerKw     Decimal?      @db.Decimal(5, 2)
+  /// Струм віддачі генератора, А.
+  amperageA   Int?
+  rotation    Rotation?
+  /// Кількість зубів на шестерні бендикса.
+  teeth       Int?
+  /// Застава за старий агрегат при купівлі на обмін, копійки.
+  coreDepositMinor Int?
+  images      String[]      @default([])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  specs     ProductSpec[]
-  prices    Price[]
-  inventory InventoryItem?
-  orderItems OrderItem[]
-  cartItems  CartItem[]
+  specs           ProductSpec[]
+  prices          Price[]
+  inventory       InventoryItem?
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
+  crossReferences CrossReference[]
+  applications    ProductApplication[]
 
   @@index([brandId])
   @@index([categoryId])
-  @@index([ratedPowerW])
+  @@index([kind, condition])
+  @@index([partNumberNorm])
+}
+
+// Крос-номер: номер того самого агрегата в каталозі виробника або техніки.
+// Головний вхід у каталог — клієнт приходить із номером, знятим з агрегата.
+model CrossReference {
+  id         String  @id @default(cuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// BOSCH, VALEO, DENSO, ISKRA, PRESTOLITE або марка техніки для OEM-номера.
+  brand      String
+  /// Номер як у каталозі виробника, з роздільниками: "0 001 368 088".
+  number     String
+  /// Той самий номер у пошуковій формі: верхній регістр, лише [A-Z0-9].
+  numberNorm String
+
+  @@unique([productId, brand, numberNorm])
+  @@index([numberNorm])
 }
 
 model ProductSpec {
@@ -248,13 +297,42 @@ model Price {
   @@index([productId])
 }
 
-// ──────────────────── Equipment presets (Selector) ───────────
-model EquipmentPreset {
-  id       String  @id @default(cuid())
-  label    String  // напр. "Холодильник побутовий"
-  powerW   Int
-  loadType String  // RESISTIVE | INDUCTIVE | MOTOR | ELECTRONIC
-  category String? // групування у формі підбору
+// ───────────────── Техніка та застосовність ──────────────────
+model MachineBrand {
+  id     String         @id @default(cuid())
+  name   String         @unique // КрАЗ, John Deere, Caterpillar
+  slug   String         @unique
+  models MachineModel[]
+}
+
+model MachineModel {
+  id      String         @id @default(cuid())
+  brandId String
+  brand   MachineBrand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name    String         // "6322", "8400", "БТР-80"
+  slug    String         @unique
+  segment MachineSegment
+
+  applications ProductApplication[]
+
+  @@unique([brandId, name])
+  @@index([segment])
+}
+
+// На яку техніку стає агрегат. Замінює підбір за потужністю.
+model ProductApplication {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  machineModelId String
+  machineModel   MachineModel @relation(fields: [machineModelId], references: [id], onDelete: Cascade)
+  engine         String?      // "ЯМЗ-238", "Cummins 6BT"
+  yearFrom       Int?
+  yearTo         Int?
+  note           String?
+
+  @@unique([productId, machineModelId, engine])
+  @@index([machineModelId])
 }
 
 // ──────────────────────── Cart & Orders ──────────────────────
@@ -339,6 +417,9 @@ model OrderItem {
   quantity      Int     @default(1)
   unitPriceMinor Int
   vatRate       Float   @default(0.2)
+  /// Артикул на момент продажу: у відновлених агрегатів номер із часом змінюється,
+  /// а в рахунку має лишитися той, за яким купували.
+  partNumberSnapshot String?
 
   @@index([orderId])
 }
@@ -418,7 +499,7 @@ model Contact {
 
 model Lead {
   id          String     @id @default(cuid())
-  source      String     // selector-form | b2b-request | b2g-request | contact
+  source      String     // part-request | reman | b2b-request | b2g-request | contact
   status      LeadStatus @default(NEW)
   segment     Segment    @default(B2C)
   name        String?
@@ -523,16 +604,4 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, entityId])
   @@index([actorId, createdAt])
-}
-
-// Факт розрахунку у формі підбору — знаменник конверсії «підбір → заявка → угода».
-model SelectorRun {
-  id           String    @id @default(cuid())
-  recommendedW Int
-  phase        PhaseType
-  usageMode    String
-  itemsCount   Int
-  createdAt    DateTime  @default(now())
-
-  @@index([createdAt])
 }

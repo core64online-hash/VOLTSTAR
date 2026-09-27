@@ -100,15 +100,25 @@ export function CartView() {
   }
 
   const field = 'mt-1 w-full rounded border border-neutral-300 px-3 py-2';
+  const coreDepositMinor = cart.lines.reduce(
+    (sum, l) => sum + (l.coreDepositMinor ?? 0) * l.quantity,
+    0,
+  );
 
   return (
     <div className="space-y-8">
       <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
         {cart.lines.map((l) => (
           <li key={l.id} className="flex flex-wrap items-center gap-3 p-4">
-            <Link href={`/${locale}/catalog/${l.slug}`} className="flex-1 font-medium hover:underline">
-              {l.name}
-            </Link>
+            <span className="flex-1">
+              <Link
+                href={`/${locale}/catalog/${l.slug}`}
+                className="font-medium hover:underline"
+              >
+                {l.name}
+              </Link>
+              <span className="block font-mono text-xs text-neutral-600">{l.partNumber}</span>
+            </span>
             <input
               type="number"
               min={1}
@@ -176,6 +186,11 @@ export function CartView() {
             value={cart.totals.deliveryMinor === 0 ? t('totals.free') : money(cart.totals.deliveryMinor)}
           />
           <Row label={t('totals.vat')} value={money(cart.totals.vatMinor)} />
+          {/* Застава за старий агрегат у суму замовлення не входить: її вносять при отриманні,
+              якщо старий агрегат не здано, і повертають, коли здано. */}
+          {coreDepositMinor > 0 && (
+            <Row label={t('totals.coreDeposit')} value={money(coreDepositMinor)} />
+          )}
           <div className="flex justify-between border-t border-neutral-200 pt-2 text-base font-bold">
             <dt>{t('totals.total')}</dt>
             <dd>{money(cart.totals.grossMinor)}</dd>

@@ -33,9 +33,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     description: seo('product', {
       name: product.name,
       brand: product.brand,
-      power: (product.ratedPowerW / 1000).toFixed(1),
-      fuel: t(`fuels.${product.fuel}`),
-      phase: t(`phases.${product.phase}`),
+      partNumber: product.partNumber,
+      kind: t(`kinds.${product.kind}`),
+      condition: t(`conditions.${product.condition}`),
       price: price ? seo('price', { price: formatPrice(price.amountMinor, price.currency, `${locale}-UA`) }) : '',
     }),
     image: product.images[0],
@@ -76,11 +76,24 @@ export default async function ProductPage({ params }: Params) {
           />
         )}
 
+        <p className="mt-2 font-mono text-lg text-neutral-800">{product.partNumber}</p>
+
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Spec label={t('power')} value={`${(product.ratedPowerW / 1000).toFixed(1)} кВт`} />
-          <Spec label={t('maxPower')} value={`${(product.maxPowerW / 1000).toFixed(1)} кВт`} />
-          <Spec label={t('phase')} value={t(`phases.${product.phase}`)} />
-          <Spec label={t('fuel')} value={t(`fuels.${product.fuel}`)} />
+          <Spec label={t('kind')} value={t(`kinds.${product.kind}`)} />
+          <Spec label={t('condition')} value={t(`conditions.${product.condition}`)} />
+          {product.voltage != null && (
+            <Spec label={t('voltage')} value={`${product.voltage} ${t('volt')}`} />
+          )}
+          {product.powerKw != null && (
+            <Spec label={t('powerKw')} value={`${product.powerKw} ${t('kw')}`} />
+          )}
+          {product.amperageA != null && (
+            <Spec label={t('amperage')} value={`${product.amperageA} ${t('ampere')}`} />
+          )}
+          {product.rotation && (
+            <Spec label={t('rotation')} value={t(`rotations.${product.rotation}`)} />
+          )}
+          {product.teeth != null && <Spec label={t('teeth')} value={String(product.teeth)} />}
         </dl>
 
         <p className="mt-6 text-sm">
@@ -97,7 +110,55 @@ export default async function ProductPage({ params }: Params) {
           </p>
         )}
 
+        {/* Застава за старий агрегат — окремою сумою, а не в ціні: клієнт має бачити, скільки
+            поверне, здавши свій агрегат, інакше ціна виглядає завищеною. */}
+        {product.coreDepositMinor != null && product.coreDepositMinor > 0 && (
+          <p className="mt-2 text-sm text-neutral-700">
+            {t('coreDeposit')}:{' '}
+            {formatPrice(product.coreDepositMinor, price?.currency ?? 'UAH', `${locale}-UA`)}{' '}
+            <span className="text-neutral-500">({t('coreDepositHint')})</span>
+          </p>
+        )}
+
         <AddToCartButton productId={product.id} disabled={!product.inStock || !price} />
+
+        {product.crossReferences.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-xl font-semibold">{t('crossReferences')}</h2>
+            <p className="mt-1 text-sm text-neutral-600">{t('crossReferencesHint')}</p>
+            <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+              {groupByBrand(product.crossReferences).map(([brand, numbers]) => (
+                <div key={brand} className="rounded-lg border border-neutral-200 p-3">
+                  <dt className="text-xs uppercase tracking-wide text-neutral-600">{brand}</dt>
+                  <dd className="mt-1 font-mono text-sm">{numbers.join(', ')}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        {product.applications.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-xl font-semibold">{t('applications')}</h2>
+            <ul className="mt-4 space-y-2 text-sm">
+              {product.applications.map((a, i) => (
+                <li key={i} className="rounded-lg border border-neutral-200 p-3">
+                  <Link
+                    href={`/${locale}/catalog?machineModel=${encodeURIComponent(a.modelSlug)}`}
+                    className="font-medium hover:underline"
+                  >
+                    {a.brand} {a.model}
+                  </Link>
+                  <span className="text-neutral-600">
+                    {a.engine ? ` · ${a.engine}` : ''}
+                    {a.yearFrom || a.yearTo ? ` · ${a.yearFrom ?? ''}–${a.yearTo ?? ''}` : ''}
+                    {` · ${t(`machineSegments.${a.segment}`)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </article>
     </main>
   );
@@ -112,13 +173,29 @@ function productJsonLd(product: Product, locale: string) {
       '@type': 'Product',
       name: product.name,
       sku: product.slug,
+      // mpn — стандартне поле schema.org для номера виробника; крос-номери йдуть як identifier,
+      // щоб пошуковики зіставляли сторінку із запитом за будь-яким із них.
+      mpn: product.partNumber,
+      ...(product.crossReferences.length
+        ? {
+            identifier: product.crossReferences.map((x) => ({
+              '@type': 'PropertyValue',
+              name: x.brand,
+              value: x.number,
+            })),
+          }
+        : {}),
       url,
       ...(product.images.length ? { image: product.images } : {}),
       brand: { '@type': 'Brand', name: product.brand },
-      additionalProperty: [
-        { '@type': 'PropertyValue', name: 'ratedPower', value: product.ratedPowerW, unitCode: 'WTT' },
-        { '@type': 'PropertyValue', name: 'maxPower', value: product.maxPowerW, unitCode: 'WTT' },
-      ],
+      ...(product.applications.length
+        ? {
+            isAccessoryOrSparePartFor: product.applications.map((a) => ({
+              '@type': 'Product',
+              name: `${a.brand} ${a.model}`,
+            })),
+          }
+        : {}),
       ...(price
         ? {
             offers: {
@@ -142,6 +219,13 @@ function productJsonLd(product: Product, locale: string) {
       ],
     },
   ];
+}
+
+/** Крос-номери групуються за виробником: у прайсах їх десятки, суцільним списком не читається. */
+function groupByBrand(refs: Product['crossReferences']): [string, string[]][] {
+  const byBrand = new Map<string, string[]>();
+  for (const x of refs) byBrand.set(x.brand, [...(byBrand.get(x.brand) ?? []), x.number]);
+  return [...byBrand.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 function Spec({ label, value }: { label: string; value: string }) {

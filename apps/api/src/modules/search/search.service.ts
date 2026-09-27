@@ -6,6 +6,7 @@ import {
   buildSearchParams,
   PRODUCT_DEFAULT_SORT,
   PRODUCT_FIELDS,
+  PRODUCT_TOKEN_SEPARATORS,
   PRODUCTS_ALIAS,
   toProductDocument,
   type ProductDocument,
@@ -17,7 +18,13 @@ export const TYPESENSE_FETCH = Symbol('TYPESENSE_FETCH');
 
 const BATCH = 500;
 const WARN_EVERY_MS = 60_000;
-const productInclude = { brand: true, category: true, inventory: true } as const;
+const productInclude = {
+  brand: true,
+  category: true,
+  inventory: true,
+  crossReferences: { select: { numberNorm: true } },
+  applications: { select: { machineModel: { select: { slug: true, segment: true } } } },
+} as const;
 
 /**
  * Пошуковий індекс каталогу в Typesense. Увімкнено, коли задано TYPESENSE_HOST і
@@ -61,7 +68,12 @@ export class SearchService implements OnApplicationBootstrap {
   async reindexAll(): Promise<{ collection: string; indexed: number }> {
     const client = this.requireClient();
     const collection = `${PRODUCTS_ALIAS}_${Date.now()}`;
-    await client.createCollection(collection, PRODUCT_FIELDS, PRODUCT_DEFAULT_SORT);
+    await client.createCollection(
+      collection,
+      PRODUCT_FIELDS,
+      PRODUCT_DEFAULT_SORT,
+      PRODUCT_TOKEN_SEPARATORS,
+    );
 
     let indexed = 0;
     try {

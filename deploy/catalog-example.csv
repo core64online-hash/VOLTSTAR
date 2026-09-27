@@ -1,5 +1,5 @@
-slug,name,brand,category,fuel,phase,ratedPowerW,maxPowerW,description,images,priceB2C,priceB2B,stock,"spec:Обʼєм бака, л","spec:Рівень шуму, дБ",spec:Запуск
-honda-eu22i,Honda EU22i,Honda,Інверторні генератори,INVERTER,SINGLE,1800,2200,"Тихий інверторний генератор для дому та виїздів.",https://example.com/img/eu22i.jpg,42990,39990,5,"3,6",48,Ручний
-generac-gp6500,Generac GP6500,Generac,Резервні генератори,PETROL,SINGLE,5500,6500,"Бензиновий генератор для резервного живлення будинку.",,31990,28990,12,"30,3",72,Ручний
-hyundai-dhy8000se,Hyundai DHY8000SE,Hyundai,Дизельні генератори,DIESEL,SINGLE,6000,6500,"Дизельний генератор з електростартером і шумозахисним кожухом.",,74990,69990,3,16,68,Електростартер
-cummins-c22d5,Cummins C22D5,Cummins,Промислові генератори,DIESEL,THREE,17600,22000,"Трифазна дизельна установка для виробництва.",,489990,459990,1,60,75,Автоматичний
+partNumber,name,brand,category,kind,condition,voltage,powerKw,amperageA,rotation,teeth,coreDeposit,description,images,priceB2C,priceB2B,stock,xref:BOSCH,xref:ISKRA,xref:OEM,fits:TRUCK,fits:AGRICULTURAL,fits:CONSTRUCTION,fits:MILITARY,spec:Кріплення,spec:Вага
+0001368088,Стартер Bosch 24V 6.6 кВт,Bosch,Стартери,STARTER,REMANUFACTURED,24,"6,6",,CW,11,3000,"Відновлений стартер на двигуни ЯМЗ. В обмін на старий агрегат.",https://example.com/img/0001368088.jpg,14500,13200,4,0 001 368 088,AZJ3151,6582.3708000,МАЗ|5440|ЯМЗ-238|2005-2015; КрАЗ|6322|ЯМЗ-238,,,,3 отвори,"10,2 кг"
+0120468131,Генератор Bosch 28V 80A,Bosch,Генератори,ALTERNATOR,NEW,28,,80,CW,,,"Новий генератор на сільгосптехніку John Deere.",,18900,17300,6,0 120 468 131,,AL120851,,John Deere|8400||2010-,,,Лапа,"8,4 кг"
+CS1268,Стартер редукторний 24V 4.5 кВт,HC-Cargo,Стартери,STARTER,EXCHANGE,24,"4,5",,CCW,10,2500,"Редукторний стартер на екскаватори з двигуном Cummins 6BT.",,11900,10800,2,0 001 231 018,,,,,"Caterpillar|320|Cummins 6BT|1998-2012",,2 отвори,"7,1 кг"
+AZE2555,Стартер 24V 7.8 кВт,Iskra,Стартери,STARTER,REMANUFACTURED,24,"7,8",,CW,12,4000,"Відновлений стартер на бронетехніку з двигуном УТД-20.",,26500,24200,1,,AZE2555,СТ-142Б,,,,БТР|80|УТД-20,Фланець,"12,8 кг"

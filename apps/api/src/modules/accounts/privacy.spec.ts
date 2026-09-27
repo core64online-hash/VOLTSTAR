@@ -60,7 +60,6 @@ describe('applyRetention', () => {
       lead: model('leads'),
       order: model('orders'),
       auditLog: model('audit'),
-      selectorRun: model('selectorRuns'),
       webhookEvent: model('webhooks'),
       $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
     };

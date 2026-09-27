@@ -21,5 +21,14 @@ export const imageUrlField = z
   .url()
   .regex(/^https?:\/\//i, 'Адреса зображення має починатися з http(s)://');
 
-/** Потужність у ватах: ціле додатне, зі стелею проти помилки на порядок. */
-export const powerWField = z.number().int().positive().max(10_000_000);
+/** Бортова напруга, В: 6/12/24/28 і подібні, зі стелею проти помилки на порядок. */
+export const voltageField = z.number().int().positive().max(120);
+
+/** Потужність стартера, кВт: до 30 кВт вистачає і найважчій техніці. */
+export const powerKwField = z.number().positive().max(30);
+
+/** Струм віддачі генератора, А. */
+export const amperageField = z.number().int().positive().max(500);
+
+/** Кількість зубів на шестерні бендикса. */
+export const teethField = z.number().int().positive().max(30);

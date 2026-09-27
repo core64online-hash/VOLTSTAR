@@ -1,20 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogService } from './catalog.service';
 
-const row = (id: string, ratedPowerW: number) => ({
+const row = (id: string, partNumberNorm = id.toUpperCase()) => ({
   id,
   slug: id,
-  name: `Gen ${id}`,
-  brand: { name: 'B', slug: 'b' },
-  category: { slug: 'c' },
+  name: `Стартер ${id}`,
+  brand: { name: 'Bosch', slug: 'bosch' },
+  category: { slug: 'startery' },
   specs: [],
   inventory: { quantity: 1 },
   prices: [],
-  fuel: 'PETROL',
-  phase: 'SINGLE',
-  ratedPowerW,
-  maxPowerW: ratedPowerW + 500,
+  kind: 'STARTER',
+  condition: 'NEW',
+  partNumber: partNumberNorm,
+  partNumberNorm,
+  voltage: 24,
+  powerKw: null,
+  amperageA: null,
+  rotation: null,
+  teeth: null,
+  coreDepositMinor: null,
   images: [],
+  crossReferences: [],
+  applications: [],
 });
 
 function setup(search: {
@@ -24,7 +32,7 @@ function setup(search: {
   const prisma = {
     product: {
       findMany: vi.fn(async (args: { where?: { id?: { in: string[] } } }) =>
-        args.where?.id ? [row('b', 2000), row('a', 1000)] : [row('db', 500)],
+        args.where?.id ? [row('b'), row('a')] : [row('db')],
       ),
       count: vi.fn(async () => 1),
     },
@@ -34,7 +42,7 @@ function setup(search: {
   return { service, prisma, warn };
 }
 
-const query = { q: 'gen', page: 1, perPage: 24 };
+const query = { q: 'стартер', page: 1, perPage: 24 };
 
 describe('CatalogService.list', () => {
   it('з Typesense: порядок — як у пошуку, total — з пошуку', async () => {
@@ -63,71 +71,75 @@ describe('CatalogService.list', () => {
     expect(res.items.map((p) => p.id)).toEqual(['db']);
     expect(prisma.product.count).toHaveBeenCalled();
   });
+
+  it('у Postgres-відкаті номер шукається і в артикулі, і в крос-номерах', async () => {
+    const { service, prisma } = setup({ enabled: false });
+    await service.list({ q: '0 001 368 088', page: 1, perPage: 24 });
+    const where = prisma.product.findMany.mock.calls[0][0].where as {
+      OR: Record<string, unknown>[];
+    };
+    expect(where.OR).toEqual([
+      { name: { contains: '0 001 368 088', mode: 'insensitive' } },
+      { partNumberNorm: { contains: '0001368088' } },
+      { crossReferences: { some: { numberNorm: { contains: '0001368088' } } } },
+    ]);
+  });
 });
 
-describe('CatalogService.candidatesForPower', () => {
-  const needs = { phase: 'SINGLE' as const, runningW: 4000, peakW: 5000, recommendedW: 5000 };
-
-  /** Два запити: смуга «із запасом» і смуга «без запасу». Пошук тут не задіяний. */
-  function setupCandidates() {
-    const calls: { where: Record<string, unknown>; orderBy: unknown; take: number }[] = [];
-    const prisma = {
-      product: {
-        findMany: vi.fn(async (args: (typeof calls)[number]) => {
-          calls.push(args);
-          return calls.length === 1 ? [priced('big', 5500)] : [priced('small', 4200)];
-        }),
-        count: vi.fn(),
-      },
-    };
-    const searchProductIds = vi.fn();
-    const service = new CatalogService(
-      prisma as never,
-      {
-        enabled: true,
-        searchProductIds,
-        warn: vi.fn(),
-      } as never,
-    );
-    return { service, calls, searchProductIds };
+describe('CatalogService.lookup', () => {
+  /** Точний збіг має знайтися одним запитом у Postgres, без участі пошуку. */
+  function setupLookup(exact: ReturnType<typeof row>[]) {
+    const findMany = vi.fn(async (_args: { where: unknown }) => exact);
+    const prisma = { product: { findMany, count: vi.fn(async () => exact.length) } };
+    const searchProductIds = vi.fn(async () => ({ ids: [], total: 0 }));
+    const service = new CatalogService(prisma as never, {
+      enabled: true,
+      searchProductIds,
+      warn: vi.fn(),
+    } as never);
+    return { service, findMany, searchProductIds };
   }
 
-  const priced = (id: string, ratedPowerW: number) => ({
-    ...row(id, ratedPowerW),
-    prices: [
-      { amountMinor: 100_00, vatRate: 0.2, priceList: { segment: 'B2C', currency: 'UAH' } },
-      { amountMinor: 90_00, vatRate: 0.2, priceList: { segment: 'B2B', currency: 'UAH' } },
-    ],
-  });
+  it('номер із роздільниками знаходить товар за нормалізованою формою', async () => {
+    const { service, findMany, searchProductIds } = setupLookup([row('p1', '0001368088')]);
+    const res = await service.lookup({ number: '0-001-368-088', segment: 'B2C', limit: 12 });
 
-  it('запитує обидві смуги з обмеженням і не чіпає пошук', async () => {
-    const { service, calls, searchProductIds } = setupCandidates();
-    const res = await service.candidatesForPower(needs, 'B2C', 6);
-
-    expect(res.map((p) => p.id)).toEqual(['big', 'small']);
+    expect(res).toMatchObject({ normalized: '0001368088', match: 'exact' });
+    expect(res.items.map((p) => p.id)).toEqual(['p1']);
     expect(searchProductIds).not.toHaveBeenCalled();
-    expect(calls).toHaveLength(2);
-
-    expect(calls[0].where).toMatchObject({
-      phase: 'SINGLE',
-      maxPowerW: { gte: 5000 },
-      ratedPowerW: { gte: 5000 },
+    expect(findMany.mock.calls[0]![0].where).toEqual({
+      OR: [
+        { partNumberNorm: '0001368088' },
+        { crossReferences: { some: { numberNorm: '0001368088' } } },
+      ],
     });
-    expect(calls[0].orderBy).toEqual({ ratedPowerW: 'asc' });
-    expect(calls[1].where).toMatchObject({
-      phase: 'SINGLE',
-      maxPowerW: { gte: 5000 },
-      ratedPowerW: { gte: 4000, lt: 5000 },
-    });
-    expect(calls[1].orderBy).toEqual({ ratedPowerW: 'desc' });
-    expect(calls.map((c) => c.take)).toEqual([6, 6]);
   });
 
-  it('ціни — лише запитаного сегмента', async () => {
-    const { service } = setupCandidates();
-    const res = await service.candidatesForPower(needs, 'B2B', 6);
-    expect(res[0].prices).toEqual([
-      { segment: 'B2B', currency: 'UAH', amountMinor: 9000, vatRate: 0.2 },
-    ]);
+  it('без точного збігу результат позначається як неточний', async () => {
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([]) // точного збігу немає
+      .mockResolvedValue([row('p2', 'AZJ3151')]);
+    const prisma = { product: { findMany, count: vi.fn(async () => 1) } };
+    const service = new CatalogService(prisma as never, {
+      enabled: false,
+      warn: vi.fn(),
+    } as never);
+
+    const res = await service.lookup({ number: 'AZJ 3151', segment: 'B2C', limit: 12 });
+    expect(res.match).toBe('fuzzy');
+    expect(res.items).toHaveLength(1);
+  });
+
+  it('нічого не знайшли — чесний порожній результат, без підміни схожим', async () => {
+    const findMany = vi.fn(async () => []);
+    const prisma = { product: { findMany, count: vi.fn(async () => 0) } };
+    const service = new CatalogService(prisma as never, {
+      enabled: false,
+      warn: vi.fn(),
+    } as never);
+
+    const res = await service.lookup({ number: 'XYZ999', segment: 'B2C', limit: 12 });
+    expect(res).toMatchObject({ match: 'none', items: [] });
   });
 });

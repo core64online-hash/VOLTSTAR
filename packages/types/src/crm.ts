@@ -14,7 +14,10 @@ export type LeadStatus = (typeof LeadStatus)[keyof typeof LeadStatus];
 
 /** Звідки прийшов лід. */
 export const LeadSource = {
-  SELECTOR_FORM: 'selector-form',
+  /** Пошук по крос-номеру не дав результату — клієнт залишив номер. */
+  PART_REQUEST: 'part-request',
+  /** Заявка на відновлення свого агрегата. */
+  REMAN: 'reman',
   B2B_REQUEST: 'b2b-request',
   B2G_REQUEST: 'b2g-request',
   CONTACT: 'contact',

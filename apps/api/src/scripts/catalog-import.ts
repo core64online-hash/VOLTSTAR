@@ -3,13 +3,20 @@
  * характеристик і перевірка схемою. Чиста логіка без БД — щоб її можна було покрити тестами,
  * а сам скрипт (import-catalog.ts) лишався тонким.
  */
-import { CatalogImportRowSchema, slugField, type CatalogImportRow } from '@voltstar/types';
+import {
+  CatalogImportRowSchema,
+  FITS_PREFIX,
+  MachineSegment,
+  SPEC_PREFIX,
+  XREF_PREFIX,
+  normalizePartNumber,
+  slugField,
+  type CatalogImportRow,
+  type MachineSegment as MachineSegmentType,
+} from '@voltstar/types';
 import type { CsvRow } from './csv';
 
-/** Колонки характеристик товару: `spec:Обʼєм бака, л` → ключ «Обʼєм бака, л». */
-export const SPEC_PREFIX = 'spec:';
-
-/** Транслітерація за постановою КМУ № 55: «Резервні генератори» → rezervni-heneratory. */
+/** Транслітерація за постановою КМУ № 55: «Стартери важкої техніки» → startery-vazhkoi-tekhniky. */
 const UK: Record<string, string> = {
   а: 'a',
   б: 'b',
@@ -84,28 +91,160 @@ export function slugify(value: string): string {
 /** Ціна з прайсу (гривні) у копійки. Множення на 100 у float дає 1899098.9999 — звідси round. */
 export const toMinor = (amount: number): number => Math.round(amount * 100);
 
+/** Колонки сімейства з префіксом: `spec:Вага` → ключ «Вага», значення з клітинки. */
+function prefixed(
+  record: Record<string, string>,
+  prefix: string,
+): { key: string; value: string }[] {
+  return Object.entries(record)
+    .filter(([column]) => column.toLowerCase().startsWith(prefix))
+    .map(([column, value]) => ({ key: column.slice(prefix.length).trim(), value: value.trim() }))
+    .filter((e) => e.key !== '' && e.value !== '');
+}
+
+/** Значення клітинки як список через «;». */
+const cellList = (value: string): string[] =>
+  value
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 /** Характеристики з колонок `spec:…`; порожні клітинки пропускаються. */
 export function parseSpecs(record: Record<string, string>): { key: string; value: string }[] {
-  return Object.entries(record)
-    .filter(([column]) => column.toLowerCase().startsWith(SPEC_PREFIX))
-    .map(([column, value]) => ({
-      key: column.slice(SPEC_PREFIX.length).trim(),
-      value: value.trim(),
-    }))
-    .filter((s) => s.key !== '' && s.value !== '');
+  return prefixed(record, SPEC_PREFIX);
+}
+
+export interface ParsedCrossReference {
+  brand: string;
+  number: string;
+  numberNorm: string;
+}
+
+/**
+ * Крос-номери з колонок `xref:BOSCH`, кілька через «;». Бренд береться з назви колонки
+ * у верхньому регістрі, щоб «xref:bosch» і «xref:Bosch» не давали два різні джерела.
+ * Дублі в межах товару схлопуються за нормалізованим номером: у прайсах той самий номер
+ * часто трапляється двічі — з роздільниками й без.
+ */
+export function parseCrossReferences(record: Record<string, string>): ParsedCrossReference[] {
+  const out = new Map<string, ParsedCrossReference>();
+  for (const { key, value } of prefixed(record, XREF_PREFIX)) {
+    const brand = key.toUpperCase();
+    for (const number of cellList(value)) {
+      const numberNorm = normalizePartNumber(number);
+      if (numberNorm.length < 3) continue;
+      out.set(`${brand}:${numberNorm}`, { brand, number, numberNorm });
+    }
+  }
+  return [...out.values()];
+}
+
+export interface ParsedApplication {
+  segment: MachineSegmentType;
+  machineBrand: string;
+  machineBrandSlug: string;
+  machineModel: string;
+  machineModelSlug: string;
+  engine: string | null;
+  yearFrom: number | null;
+  yearTo: number | null;
+}
+
+/** Роки застосовності: «2005-2015», «2005-» (досі випускається), «-2015» або одинарний «2005». */
+function parseYears(value: string): { yearFrom: number | null; yearTo: number | null } | null {
+  const single = /^(\d{4})$/.exec(value);
+  if (single) return { yearFrom: Number(single[1]), yearTo: Number(single[1]) };
+  const range = /^(\d{4})?\s*-\s*(\d{4})?$/.exec(value);
+  if (!range || (!range[1] && !range[2])) return null;
+  return {
+    yearFrom: range[1] ? Number(range[1]) : null,
+    yearTo: range[2] ? Number(range[2]) : null,
+  };
+}
+
+/**
+ * Техніка з колонок `fits:TRUCK`, кілька записів через «;». Запис — поля через «|»:
+ *
+ *   Марка|Модель|Двигун|Роки     напр. «МАЗ|5440|ЯМЗ-238|2005-2015»
+ *
+ * Двигун і роки необовʼязкові. Формат із роздільником, а не вільний текст, свідомо: марки
+ * бувають із двох слів («John Deere»), і «перше слово — марка» ламалося б на них мовчки.
+ */
+export function parseApplications(record: Record<string, string>): {
+  applications: ParsedApplication[];
+  errors: string[];
+} {
+  const applications: ParsedApplication[] = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const { key, value } of prefixed(record, FITS_PREFIX)) {
+    const segment = key.toUpperCase();
+    if (!(segment in MachineSegment)) {
+      errors.push(
+        `${FITS_PREFIX}${key}: невідома група техніки — очікується одна з: ${Object.values(MachineSegment).join(', ')}`,
+      );
+      continue;
+    }
+    for (const entry of cellList(value)) {
+      const [brand, model, engine, years] = entry.split('|').map((s) => s.trim());
+      if (!brand || !model) {
+        errors.push(`${FITS_PREFIX}${key}: «${entry}» — потрібно щонайменше «Марка|Модель»`);
+        continue;
+      }
+      let yearFrom: number | null = null;
+      let yearTo: number | null = null;
+      if (years) {
+        const parsed = parseYears(years);
+        if (!parsed) {
+          errors.push(`${FITS_PREFIX}${key}: «${years}» — роки у форматі 2005-2015`);
+          continue;
+        }
+        ({ yearFrom, yearTo } = parsed);
+      }
+      const machineBrandSlug = slugify(brand);
+      const machineModelSlug = slugify(`${brand} ${model}`);
+      if (
+        !slugField.safeParse(machineBrandSlug).success ||
+        !slugField.safeParse(machineModelSlug).success
+      ) {
+        errors.push(`${FITS_PREFIX}${key}: з «${brand} ${model}» не вдалося зробити машинну назву`);
+        continue;
+      }
+      const dedupe = `${machineModelSlug}:${engine ?? ''}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+      applications.push({
+        segment: segment as MachineSegmentType,
+        machineBrand: brand,
+        machineBrandSlug,
+        machineModel: model,
+        machineModelSlug,
+        engine: engine || null,
+        yearFrom,
+        yearTo,
+      });
+    }
+  }
+  return { applications, errors };
 }
 
 export interface PreparedProduct {
   line: number;
   row: CatalogImportRow;
+  /** Адреса сторінки: з колонки або з бренду й артикула. */
+  slug: string;
+  partNumberNorm: string;
   brandSlug: string;
   categorySlug: string;
   specs: { key: string; value: string }[];
+  crossReferences: ParsedCrossReference[];
+  applications: ParsedApplication[];
 }
 
 export interface RowError {
   line: number;
-  slug: string | null;
+  partNumber: string | null;
   messages: string[];
 }
 
@@ -119,26 +258,33 @@ export interface PreparedImport {
 /** Чи була колонка в заголовку файлу (не плутати з порожньою клітинкою). */
 export const hasColumn = (columns: Set<string>, name: string): boolean => columns.has(name);
 
-/** Чи був у заголовку хоч один `spec:` — інакше характеристики товарів не чіпаємо. */
+/** Чи був у заголовку хоч один `spec:`/`xref:`/`fits:` — інакше цих даних не чіпаємо. */
+export const hasPrefixedColumns = (columns: Set<string>, prefix: string): boolean =>
+  [...columns].some((c) => c.toLowerCase().startsWith(prefix));
+
 export const hasSpecColumns = (columns: Set<string>): boolean =>
-  [...columns].some((c) => c.toLowerCase().startsWith(SPEC_PREFIX));
+  hasPrefixedColumns(columns, SPEC_PREFIX);
 
 /**
  * Перевіряє рядки й доповнює похідними полями. Помилки збираються по рядках: один битий рядок
  * не має зривати весь прайс.
+ *
+ * Ключ товару — артикул (`partNumber`), а не адреса сторінки: у прайсі постачальника адреси
+ * немає, а артикул є завжди, і саме він лишається сталим між вивантаженнями.
  */
 export function prepareRows(rows: CsvRow[]): PreparedImport {
   const products: PreparedProduct[] = [];
   const errors: RowError[] = [];
   const columns = new Set<string>(rows.length > 0 ? Object.keys(rows[0].record) : []);
-  const seen = new Map<string, number>();
+  const seenPart = new Map<string, number>();
+  const seenSlug = new Map<string, number>();
 
   for (const { line, record } of rows) {
     const parsed = CatalogImportRowSchema.safeParse(record);
     if (!parsed.success) {
       errors.push({
         line,
-        slug: record.slug?.trim() || null,
+        partNumber: record.partNumber?.trim() || null,
         messages: parsed.error.issues.map((i) =>
           i.path.length > 0 ? `${i.path.join('.')}: ${i.message}` : i.message,
         ),
@@ -146,18 +292,21 @@ export function prepareRows(rows: CsvRow[]): PreparedImport {
       continue;
     }
     const row = parsed.data;
-    const duplicateOf = seen.get(row.slug);
+    const partNumberNorm = normalizePartNumber(row.partNumber);
+    const duplicateOf = seenPart.get(partNumberNorm);
     if (duplicateOf !== undefined) {
       errors.push({
         line,
-        slug: row.slug,
-        messages: [`Дубль slug у файлі (вже був у рядку ${duplicateOf})`],
+        partNumber: row.partNumber,
+        messages: [`Дубль артикула у файлі (вже був у рядку ${duplicateOf})`],
       });
       continue;
     }
-    // Похідні машинні назви теж мають пройти перевірку: з «АВР-2» чи «???» транслітерація
+
+    // Похідні машинні назви теж мають пройти перевірку: з «АТЭ-1» чи «???» транслітерація
     // дає надто коротке або порожнє значення, і тоді потрібна явна колонка.
     const derived = [
+      ['slug', `${row.brand} ${row.partNumber}`, row.slug ?? slugify(`${row.brand} ${row.partNumber}`)],
       ['brandSlug', row.brand, row.brandSlug ?? slugify(row.brand)],
       ['categorySlug', row.category, row.categorySlug ?? slugify(row.category)],
     ] as const;
@@ -165,7 +314,7 @@ export function prepareRows(rows: CsvRow[]): PreparedImport {
     if (badSlugs.length > 0) {
       errors.push({
         line,
-        slug: row.slug,
+        partNumber: row.partNumber,
         messages: badSlugs.map(
           ([field, source]) =>
             `${field}: не вдалося зробити машинну назву з «${source}» — задайте колонку ${field}`,
@@ -173,14 +322,36 @@ export function prepareRows(rows: CsvRow[]): PreparedImport {
       });
       continue;
     }
+    const [slug, brandSlug, categorySlug] = derived.map(([, , value]) => value);
 
-    seen.set(row.slug, line);
+    const slugDuplicateOf = seenSlug.get(slug);
+    if (slugDuplicateOf !== undefined) {
+      errors.push({
+        line,
+        partNumber: row.partNumber,
+        messages: [`Адреса «${slug}» вже зайнята рядком ${slugDuplicateOf} — задайте колонку slug`],
+      });
+      continue;
+    }
+
+    const { applications, errors: fitsErrors } = parseApplications(record);
+    if (fitsErrors.length > 0) {
+      errors.push({ line, partNumber: row.partNumber, messages: fitsErrors });
+      continue;
+    }
+
+    seenPart.set(partNumberNorm, line);
+    seenSlug.set(slug, line);
     products.push({
       line,
       row,
-      brandSlug: derived[0][2],
-      categorySlug: derived[1][2],
+      slug,
+      partNumberNorm,
+      brandSlug,
+      categorySlug,
       specs: parseSpecs(record),
+      crossReferences: parseCrossReferences(record),
+      applications,
     });
   }
 

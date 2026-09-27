@@ -4,8 +4,9 @@ import type { Product } from '@voltstar/types';
 import { formatPrice } from '../lib/api';
 
 /**
- * Картка товару — спільна для каталогу й рекомендацій підбору, щоб два списки не розʼїхалися
- * виглядом. Працює і в серверному рендері, і в клієнтському (next-intl підтримує обидва).
+ * Картка агрегата — спільна для каталогу, результатів пошуку по номеру й сторінок техніки,
+ * щоб списки не розʼїхалися виглядом. Артикул на видноті: клієнт звіряє саме його.
+ * Працює і в серверному рендері, і в клієнтському (next-intl підтримує обидва).
  */
 export function ProductCard({ product, locale }: { product: Product; locale: string }) {
   const t = useTranslations('catalog');
@@ -20,9 +21,10 @@ export function ProductCard({ product, locale }: { product: Product; locale: str
         {product.brand}
       </span>
       <span className="mt-1 text-lg font-semibold">{product.name}</span>
+      <span className="mt-1 font-mono text-sm text-neutral-700">{product.partNumber}</span>
       <span className="mt-2 text-sm text-neutral-600">
-        {t('power')}: {(product.ratedPowerW / 1000).toFixed(1)} кВт · {t('fuel')}:{' '}
-        {t(`fuels.${product.fuel}`)}
+        {t(`kinds.${product.kind}`)} · {t(`conditions.${product.condition}`)}
+        {product.voltage ? ` · ${product.voltage} ${t('volt')}` : ''}
       </span>
       <span className="mt-3 text-sm">
         {product.inStock ? (

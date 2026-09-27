@@ -17,8 +17,6 @@ export const RETENTION_DAYS = {
   b2cOrderContacts: 1095,
   /** Журнал дій персоналу. */
   auditLog: 3 * 365,
-  /** Факти розрахунків підбору (знеособлені, для статистики). */
-  selectorRuns: 2 * 365,
   /** Ідентифікатори оброблених вебхуків (захист від повторів). */
   webhookEvents: 365,
 } as const;
@@ -41,30 +39,27 @@ export async function applyRetention(prisma: PrismaService, opts: { now?: Date; 
       OR: [{ contactName: { not: null } }, { contactEmail: { not: null } }, { contactPhone: { not: null } }],
     },
     auditLog: { createdAt: { lt: before(d.auditLog) } },
-    selectorRuns: { createdAt: { lt: before(d.selectorRuns) } },
     webhookEvents: { receivedAt: { lt: before(d.webhookEvents) } },
   };
 
   if (opts.dryRun) {
-    const [resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, selectorRuns, webhookEvents] = await Promise.all([
+    const [resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, webhookEvents] = await Promise.all([
       prisma.passwordResetToken.count({ where: where.resetTokens }),
       prisma.cart.count({ where: where.carts }),
       prisma.lead.count({ where: where.leadsWithoutDeal }),
       prisma.order.count({ where: where.b2cOrderContacts }),
       prisma.auditLog.count({ where: where.auditLog }),
-      prisma.selectorRun.count({ where: where.selectorRuns }),
       prisma.webhookEvent.count({ where: where.webhookEvents }),
     ]);
-    return { resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, selectorRuns, webhookEvents };
+    return { resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, webhookEvents };
   }
 
-  const [resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, selectorRuns, webhookEvents] = await prisma.$transaction([
+  const [resetTokens, carts, leadsWithoutDeal, b2cOrderContacts, auditLog, webhookEvents] = await prisma.$transaction([
     prisma.passwordResetToken.deleteMany({ where: where.resetTokens }),
     prisma.cart.deleteMany({ where: where.carts }),
     prisma.lead.deleteMany({ where: where.leadsWithoutDeal }),
     prisma.order.updateMany({ where: where.b2cOrderContacts, data: { contactName: null, contactEmail: null, contactPhone: null } }),
     prisma.auditLog.deleteMany({ where: where.auditLog }),
-    prisma.selectorRun.deleteMany({ where: where.selectorRuns }),
     prisma.webhookEvent.deleteMany({ where: where.webhookEvents }),
   ]);
   return {
@@ -73,7 +68,6 @@ export async function applyRetention(prisma: PrismaService, opts: { now?: Date; 
     leadsWithoutDeal: leadsWithoutDeal.count,
     b2cOrderContacts: b2cOrderContacts.count,
     auditLog: auditLog.count,
-    selectorRuns: selectorRuns.count,
     webhookEvents: webhookEvents.count,
   };
 }

@@ -26,8 +26,18 @@ export class AnalyticsService {
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    const [sales, funnel, selector] = await Promise.all([this.sales(period), this.funnel(period), this.selector(period)]);
-    return { period: { from: period.from, to: period.to }, currency: REPORT_CURRENCY, sales, funnel, selector };
+    const [sales, funnel, partRequests] = await Promise.all([
+      this.sales(period),
+      this.funnel(period),
+      this.partRequests(period),
+    ]);
+    return {
+      period: { from: period.from, to: period.to },
+      currency: REPORT_CURRENCY,
+      sales,
+      funnel,
+      partRequests,
+    };
   }
 
   /** Продажі за датою оплати (подія PAID у журналі статусів), повернення — за датою повернення. */
@@ -139,14 +149,20 @@ export class AnalyticsService {
     };
   }
 
-  /** Конверсія форми підбору: розрахунки → заявки з форми → угоди з цих заявок. */
-  private async selector(p: Period): Promise<Analytics['selector']> {
+  /**
+   * Запити на підбір агрегата по номеру: заявки з форми → угоди з цих заявок.
+   * Знаменника «скільки разів шукали» тут немає навмисне: пошук по номеру кешується
+   * і публічний, рахувати кожне натискання означало б зламати кеш заради статистики.
+   */
+  private async partRequests(p: Period): Promise<Analytics['partRequests']> {
     const inPeriod = { gte: p.start, lt: p.end };
-    const [runs, leads, deals] = await Promise.all([
-      this.prisma.selectorRun.count({ where: { createdAt: inPeriod } }),
-      this.prisma.lead.count({ where: { source: 'selector-form', createdAt: inPeriod } }),
-      this.prisma.deal.count({ where: { lead: { source: 'selector-form', createdAt: inPeriod } } }),
+    const sources = ['part-request', 'reman'];
+    const [leads, deals] = await Promise.all([
+      this.prisma.lead.count({ where: { source: { in: sources }, createdAt: inPeriod } }),
+      this.prisma.deal.count({
+        where: { lead: { source: { in: sources }, createdAt: inPeriod } },
+      }),
     ]);
-    return { runs, leads, deals, leadRate: ratio(leads, runs) };
+    return { leads, deals, dealRate: ratio(deals, leads) };
   }
 }

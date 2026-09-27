@@ -14,7 +14,7 @@ const STATIC_PAGES: {
 }[] = [
   { path: '', priority: 1, changeFrequency: 'weekly' },
   { path: '/catalog', priority: 0.9, changeFrequency: 'daily' },
-  { path: '/selector', priority: 0.8, changeFrequency: 'monthly' },
+  { path: '/vidnovlennia', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/business', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/privacy', priority: 0.2, changeFrequency: 'yearly' },
 ];

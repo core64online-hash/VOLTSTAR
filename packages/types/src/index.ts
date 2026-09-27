@@ -4,7 +4,7 @@
  */
 export * from './enums';
 export * from './fields';
-export * from './selector';
+export * from './part-number';
 export * from './catalog';
 export * from './catalog-import';
 export * from './accounts';
