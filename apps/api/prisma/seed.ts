@@ -1,105 +1,41 @@
 /**
- * Демо-сідінг для локальної розробки VOLTSTAR.
+ * Початкові довідники VOLTSTAR — те, без чого не працює імпорт і кабінет.
  * Запуск: pnpm --filter @voltstar/api seed
  *
- * Дає рівно стільки даних, щоб пройти шлях клієнта: крос-номер у пошуку → товар → кошик.
- * Реальний каталог наповнюється імпортом (`catalog:import`), а не звідси.
+ * Товарів тут навмисно немає. Каталог наповнюється лише з реальних джерел
+ * (`catalog:import` із прайсу постачальника чи `catalog:import-pdf` із каталогу
+ * застосовності) — демонстраційні позиції на робочому сайті небезпечні: клієнт
+ * замовив би агрегат, якого немає.
+ *
+ * Запускати можна скільки завгодно разів — нічого не дублює й не перезаписує.
  */
 import { PrismaClient } from '@prisma/client';
-import { normalizePartNumber } from '@voltstar/types';
 
 const prisma = new PrismaClient();
 
+/** Прайс-листи, на які спираються ціни: роздріб для приватних, опт для організацій. */
+const PRICE_LISTS = [
+  { name: 'Роздріб', segment: 'B2C' as const, currency: 'UAH' as const },
+  { name: 'Опт', segment: 'B2B' as const, currency: 'UAH' as const },
+];
+
 async function main() {
-  const bosch = await prisma.brand.upsert({
-    where: { slug: 'bosch' },
-    update: {},
-    create: { name: 'Bosch', slug: 'bosch' },
-  });
-
-  const starters = await prisma.category.upsert({
-    where: { slug: 'startery' },
-    update: {},
-    create: { name: 'Стартери', slug: 'startery' },
-  });
-
-  const b2cList = await prisma.priceList.upsert({
-    where: { segment_currency_name: { segment: 'B2C', currency: 'UAH', name: 'Роздріб' } },
-    update: {},
-    create: { name: 'Роздріб', segment: 'B2C', currency: 'UAH' },
-  });
-
-  const partNumber = '0001368088';
-  const product = await prisma.product.upsert({
-    where: { partNumber },
-    update: {},
-    create: {
-      slug: 'bosch-0001368088',
-      name: 'Стартер Bosch 24V 6.6 кВт',
-      description: 'Відновлений стартер на двигуни ЯМЗ. Продається в обмін на старий агрегат.',
-      brandId: bosch.id,
-      categoryId: starters.id,
-      kind: 'STARTER',
-      condition: 'REMANUFACTURED',
-      partNumber,
-      partNumberNorm: normalizePartNumber(partNumber),
-      voltage: 24,
-      powerKw: 6.6,
-      rotation: 'CW',
-      teeth: 11,
-      coreDepositMinor: 300000,
-      inventory: { create: { quantity: 4 } },
-    },
-  });
-
-  // Крос-номери — те, за чим клієнт шукає насправді.
-  for (const xref of [
-    { brand: 'BOSCH', number: '0 001 368 088' },
-    { brand: 'ISKRA', number: 'AZJ3151' },
-    { brand: 'ЯМЗ', number: '6582.3708000' },
-  ]) {
-    await prisma.crossReference.upsert({
+  for (const list of PRICE_LISTS) {
+    await prisma.priceList.upsert({
       where: {
-        productId_brand_numberNorm: {
-          productId: product.id,
-          brand: xref.brand,
-          numberNorm: normalizePartNumber(xref.number),
+        segment_currency_name: {
+          segment: list.segment,
+          currency: list.currency,
+          name: list.name,
         },
       },
       update: {},
-      create: { ...xref, productId: product.id, numberNorm: normalizePartNumber(xref.number) },
+      create: list,
     });
   }
 
-  const maz = await prisma.machineBrand.upsert({
-    where: { slug: 'maz' },
-    update: {},
-    create: { name: 'МАЗ', slug: 'maz' },
-  });
-  const maz5440 = await prisma.machineModel.upsert({
-    where: { slug: 'maz-5440' },
-    update: {},
-    create: { brandId: maz.id, name: '5440', slug: 'maz-5440', segment: 'TRUCK' },
-  });
-  await prisma.productApplication.upsert({
-    where: {
-      productId_machineModelId_engine: {
-        productId: product.id,
-        machineModelId: maz5440.id,
-        engine: 'ЯМЗ-238',
-      },
-    },
-    update: {},
-    create: { productId: product.id, machineModelId: maz5440.id, engine: 'ЯМЗ-238' },
-  });
-
-  await prisma.price.upsert({
-    where: { productId_priceListId: { productId: product.id, priceListId: b2cList.id } },
-    update: {},
-    create: { productId: product.id, priceListId: b2cList.id, amountMinor: 1450000, vatRate: 0.2 },
-  });
-
-  console.log('Seed завершено ✅');
+  console.log(`Seed завершено ✅ прайс-листів: ${PRICE_LISTS.length}, товарів не створено.`);
+  console.log('   Каталог наповнюється імпортом: catalog:import або catalog:pdf-to-csv.');
 }
 
 main()
