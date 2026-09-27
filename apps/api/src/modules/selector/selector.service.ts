@@ -18,6 +18,16 @@ const MODE_RESERVE: Record<SelectorInput['usageMode'], number> = {
 
 const POWER_FACTOR = 0.8; // cosφ для перерахунку кВт → кВА
 
+/** Те з розрахунку, від чого залежить добір товарів. */
+export type PowerNeeds = Pick<PowerCalculation, 'runningW' | 'peakW' | 'recommendedW' | 'phase'>;
+
+/** Мінімум полів товару, потрібний для добору (підходить і Prisma-рядок, і публічний DTO). */
+export interface Candidate {
+  ratedPowerW: number;
+  maxPowerW: number;
+  phase: string;
+}
+
 @Injectable()
 export class SelectorService {
   /**
@@ -62,16 +72,39 @@ export class SelectorService {
   }
 
   /**
-   * Ранжування кандидатів каталогу за відповідністю розрахунку.
-   * Повний підбір із БД/Typesense реалізується у Phase 1.
+   * Ранжування кандидатів каталогу за відповідністю розрахунку: генератор має покривати
+   * і рекомендовану потужність із запасом, і піковий стрибок.
    */
-  rankCandidates<T extends { ratedPowerW: number; maxPowerW: number; phase: string }>(
-    candidates: T[],
-    calc: PowerCalculation,
-  ): T[] {
+  rankCandidates<T extends Candidate>(candidates: T[], calc: PowerNeeds): T[] {
     return candidates
       .filter((c) => c.ratedPowerW >= calc.recommendedW && c.maxPowerW >= calc.peakW)
       .filter((c) => c.phase === calc.phase)
       .sort((a, b) => a.ratedPowerW - b.ratedPowerW); // найближчий за потужністю — першим
+  }
+
+  /**
+   * Дві групи кандидатів для сторінки підбору.
+   *
+   * `exact` — те саме, що `rankCandidates`: повністю покриває розрахунок.
+   * `close` — потягне навантаження (`ratedPowerW >= runningW`) і витримає пусковий стрибок
+   * (`maxPowerW >= peakW`), але запас менший за той, що задав клієнт. Показувати такі варто:
+   * запас — це побажання, а не фізична межа. Сортуються за спаданням, щоб найближчий знизу
+   * був першим.
+   *
+   * Фазність в обох групах збігається точно й ніколи не послаблюється: однофазному будинку
+   * трифазний генератор не підходить, і навпаки.
+   */
+  matchCandidates<T extends Candidate>(
+    candidates: T[],
+    calc: PowerNeeds,
+  ): { exact: T[]; close: T[] } {
+    const exact = this.rankCandidates(candidates, calc);
+    const inExact = new Set<T>(exact);
+    const close = candidates
+      .filter((c) => !inExact.has(c))
+      .filter((c) => c.phase === calc.phase)
+      .filter((c) => c.maxPowerW >= calc.peakW && c.ratedPowerW >= calc.runningW)
+      .sort((a, b) => b.ratedPowerW - a.ratedPowerW);
+    return { exact, close };
   }
 }

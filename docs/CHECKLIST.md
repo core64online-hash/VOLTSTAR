@@ -11,20 +11,20 @@
 - [x] `docker-compose.yml`: postgres, redis, typesense, mailhog
 - [x] `.github/workflows/ci.yml`: install → lint → typecheck → test → build
 - [x] `docs/`: ARCHITECTURE.md, ROADMAP.md, CHECKLIST.md, README
-- [ ] Локальний запуск перевірено (`pnpm install`, `docker-compose up`, `pnpm dev`)
+- [x] Локальний запуск перевірено (`pnpm install`, `docker-compose up`, `pnpm dev`)
 - [x] Перша Prisma-міграція згенерована в оточенні з БД (`prisma/migrations/*_init`)
 
 ## Phase 1 — Каталог + Підбір
 - [x] Моделі Product/Category/Brand/ProductSpec/InventoryItem + міграції (`init`)
 - [x] API каталогу (список з фільтрами й пагінацією, фасети, товар за slug) + сідінг демо-даних
-- [ ] Керування каталогом (створення/редагування товарів) — в адмін-панелі (Phase 6)
+- [x] Керування каталогом (створення/редагування товарів, ціни, склад) — в адмін-панелі; масове наповнення з прайсу — `catalog:import` (CSV або посилання на Google Таблицю)
 - [x] Інтеграція Typesense: індекс через аліас (переіндексація без простою), пошук, стійкий до опечаток, резервний Postgres, синхронізація наявності після оформлення/скасування
 - [ ] Фонова переіндексація через BullMQ (зараз: `POST /api/search/reindex`, `pnpm search:reindex`, `TYPESENSE_SYNC_ON_START`)
 - [x] Фронт: список каталогу з фасетними фільтрами, сторінка товару
-- [ ] SEO каталогу (метадані товару, sitemap, schema.org) — Phase 7
+- [x] SEO каталогу (метадані товару, sitemap з товарами, JSON-LD Product/Offer/BreadcrumbList) — Phase 7
 - [x] EquipmentPreset (профілі навантаження типової техніки)
 - [x] Форма підбору (UI) → `/api/selector/calculate` → рекомендована потужність
-- [ ] Ранжований список товарів під розрахунок у формі підбору (сервіс `rankCandidates` є, UI — ні)
+- [x] Ранжований список товарів під розрахунок у формі підбору: `GET /api/selector/recommendations` (точні збіги й «близькі за потужністю»), картки товарів на сторінці підбору, посилання на каталог із фільтром потужності
 - [x] Тести: розрахунок потужності, пошук (unit + контрактний тест HTTP API Typesense)
 
 ## Phase 2 — Акаунти, сегменти, ціни
@@ -105,6 +105,8 @@
 - [x] Node 22 LTS в образах і CI; образ API 1,04 ГБ → 736 МБ (лише залежності для запуску)
 - [x] Копії бекапів поза сервером (сервіс `offsite`, rclone → S3/R2/B2, шифрування, строк зберігання) і відновлення з них (`list` / `fetch`) — вмикається змінними `OFFSITE_*`
 - [x] Звіти про помилки API, серверного рендеру й браузера (Sentry-сумісні, без персональних даних) — вмикається `SENTRY_DSN`
-- [ ] Увімкнути на production: бакет і ключі `OFFSITE_*`, `SENTRY_DSN`; environment `production` і `PRODUCTION_URL` у GitHub
+- [x] Копії бекапів у Cloudflare R2 увімкнено на staging і production (`OFFSITE_*`, шифрування) — перевірено за журналами сервісу `offsite`
+- [ ] Увімкнути на production `SENTRY_DSN` і перевірити, що звіти доходять
+- [ ] Автодеплой production: environment `production` і змінна `PRODUCTION_URL` у GitHub (зараз job `Production` пропускається)
 - [ ] Дашборди Grafana й алерти за метриками `/api/metrics`
 - [ ] Запуск 🚀 + пост-реліз спостереження (2 тижні)

@@ -4,6 +4,7 @@ import type {
   PowerCalculation,
   Product,
   SelectorInput,
+  SelectorRecommendations,
 } from '@voltstar/types';
 
 const PUBLIC_API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -93,6 +94,26 @@ export async function calculatePower(input: SelectorInput): Promise<PowerCalcula
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`selector request failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Генератори під готовий розрахунок. GET — щоб відповідь кешувалася браузером і CDN так само,
+ * як каталог (заголовки ставить API); `cache` навмисно не перевизначаємо.
+ */
+export async function fetchRecommendations(
+  calc: PowerCalculation,
+  segment = 'B2C',
+): Promise<SelectorRecommendations> {
+  const qs = new URLSearchParams({
+    runningW: String(calc.runningW),
+    peakW: String(calc.peakW),
+    recommendedW: String(calc.recommendedW),
+    phase: calc.phase,
+    segment,
+  });
+  const res = await fetch(apiUrl(`/selector/recommendations?${qs.toString()}`));
+  if (!res.ok) throw new Error(`recommendations request failed: ${res.status}`);
   return res.json();
 }
 

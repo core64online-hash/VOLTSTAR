@@ -62,3 +62,36 @@ export const EquipmentPresetSchema = z.object({
   category: z.string().nullable().optional(),
 });
 export type EquipmentPreset = z.infer<typeof EquipmentPresetSchema>;
+
+/**
+ * Параметри добору товарів під розрахунок підбору. Приходять у query-рядку GET-запиту,
+ * тому ендпоінт кешується так само, як решта каталогу.
+ */
+export const SelectorRecommendationQuerySchema = z
+  .object({
+    /** Сумарна робоча потужність, Вт. */
+    runningW: z.number().int().positive(),
+    /** Пікова потужність із пусковими струмами, Вт. */
+    peakW: z.number().int().positive(),
+    /** Рекомендована потужність із запасом, Вт. */
+    recommendedW: z.number().int().positive(),
+    phase: PhaseTypeSchema,
+    segment: SegmentSchema.default('B2C'),
+    limit: z.number().int().min(1).max(12).default(6),
+  })
+  .refine((q) => q.peakW >= q.runningW && q.recommendedW >= q.peakW, {
+    message: 'Суперечливі параметри розрахунку',
+  });
+export type SelectorRecommendationQuery = z.infer<typeof SelectorRecommendationQuerySchema>;
+
+/**
+ * Дві групи: `exact` покриває розрахунок повністю, `close` тягне навантаження, але із меншим
+ * запасом, ніж просив клієнт. `catalogQuery` — готові фільтри для посилання «дивитись у каталозі»,
+ * щоб їх не збирав кожен фронтенд окремо.
+ */
+export const SelectorRecommendationsSchema = z.object({
+  exact: z.array(ProductSchema),
+  close: z.array(ProductSchema),
+  catalogQuery: z.object({ phase: PhaseTypeSchema, minPowerW: z.number().int() }),
+});
+export type SelectorRecommendations = z.infer<typeof SelectorRecommendationsSchema>;

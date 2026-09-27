@@ -19,9 +19,18 @@
   },
   "segments": {
     "title": "We serve every segment",
-    "b2c": { "title": "Private customers", "text": "Retail prices and instant online payment." },
-    "b2b": { "title": "Business", "text": "Wholesale prices, invoice payment, personal manager." },
-    "b2g": { "title": "Government", "text": "Tender document flow and reporting." }
+    "b2c": {
+      "title": "Private customers",
+      "text": "Retail prices and instant online payment."
+    },
+    "b2b": {
+      "title": "Business",
+      "text": "Wholesale prices, invoice payment, personal manager."
+    },
+    "b2g": {
+      "title": "Government",
+      "text": "Tender document flow and reporting."
+    }
   },
   "features": {
     "selector": "Smart power-based selection",
@@ -52,8 +61,15 @@
       "MOTOR": "Motor (compressor)",
       "ELECTRONIC": "Electronics (PC)"
     },
-    "phases": { "SINGLE": "1 phase (230 V)", "THREE": "3 phase (400 V)" },
-    "modes": { "BACKUP": "Backup", "PRIME": "Prime", "MOBILE": "Mobile" },
+    "phases": {
+      "SINGLE": "1 phase (230 V)",
+      "THREE": "3 phase (400 V)"
+    },
+    "modes": {
+      "BACKUP": "Backup",
+      "PRIME": "Prime",
+      "MOBILE": "Mobile"
+    },
     "result": {
       "title": "Recommendation",
       "running": "Running power",
@@ -62,10 +78,21 @@
       "kva": "Apparent power",
       "cta": "Find in catalog"
     },
-    "preset": { "add": "Quick-add equipment", "choose": "Pick from list…" },
+    "preset": {
+      "add": "Quick-add equipment",
+      "choose": "Pick from list…"
+    },
     "consult": {
       "title": "Need advice?",
       "text": "Leave your contacts — a manager will pick a specific model for your calculation and call you back."
+    },
+    "recommend": {
+      "title": "Matching your calculation",
+      "closeTitle": "Close on power",
+      "closeHint": "These handle the load and the inrush, but with less headroom than you asked for.",
+      "loading": "Looking for generators…",
+      "empty": "No exact match in the catalog yet. Browse the catalog filtered by power, or leave a request and a manager will pick a model.",
+      "catalogLink": "View in catalog"
     }
   },
   "catalog": {
@@ -91,7 +118,9 @@
       "inStock": "In stock only",
       "apply": "Apply",
       "reset": "Reset",
-      "all": "All"
+      "all": "All",
+      "minPower": "Power from, W",
+      "maxPower": "Power to, W"
     },
     "fuels": {
       "PETROL": "Petrol",
@@ -100,7 +129,10 @@
       "DUAL_FUEL": "Dual fuel",
       "INVERTER": "Inverter"
     },
-    "phases": { "SINGLE": "1 phase", "THREE": "3 phase" }
+    "phases": {
+      "SINGLE": "1 phase",
+      "THREE": "3 phase"
+    }
   },
   "account": {
     "email": "Email",

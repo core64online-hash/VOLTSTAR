@@ -14,6 +14,7 @@ import {
   type UsageMode as UsageModeT,
 } from '@voltstar/types';
 import { calculatePower, fetchPresets } from '../../../lib/api';
+import { Recommendations } from './recommendations';
 import { LeadForm } from '../../../components/lead-form';
 
 let nextId = 1;
@@ -250,6 +251,8 @@ export function SelectorForm() {
           </div>
         )}
       </form>
+
+      {result && <Recommendations calc={result} />}
 
       {result && (
         <section className="rounded-xl border border-neutral-200 p-5">

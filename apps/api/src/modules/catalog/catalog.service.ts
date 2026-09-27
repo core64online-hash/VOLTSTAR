@@ -4,6 +4,7 @@ import type {
   CatalogFacets,
   CatalogQuery,
   EquipmentPreset,
+  PhaseType,
   Product,
   Segment,
 } from '@voltstar/types';
@@ -39,7 +40,10 @@ export class CatalogService {
     if (this.search.enabled) {
       try {
         const { ids, total } = await this.search.searchProductIds(query);
-        const rows = await this.prisma.product.findMany({ where: { id: { in: ids } }, include: productInclude });
+        const rows = await this.prisma.product.findMany({
+          where: { id: { in: ids } },
+          include: productInclude,
+        });
         const byId = new Map(rows.map((r) => [r.id, r]));
         const items = ids.flatMap((id) => {
           const row = byId.get(id);
@@ -109,6 +113,41 @@ export class CatalogService {
       loadType: r.loadType as EquipmentPreset['loadType'],
       category: r.category,
     }));
+  }
+
+  /**
+   * Кандидати під розрахунок підбору. Два запити, а не один: якщо взяти «все від робочої
+   * потужності вгору» з обмеженням, на великому каталозі вибірка заповниться слабкими
+   * моделями й точні збіги до неї просто не потраплять. Тому окремо смуга «з запасом»
+   * (від рекомендованої, знизу вгору) і окремо «без запасу» (нижче рекомендованої, згори вниз).
+   *
+   * Пошук тут не потрібен: текстового запиту немає, умова числова, а `@@index([ratedPowerW])`
+   * її вже покриває — Typesense додав би лише ще одну точку відмови.
+   */
+  async candidatesForPower(
+    needs: { phase: PhaseType; runningW: number; peakW: number; recommendedW: number },
+    segment: Segment = 'B2C',
+    take = 12,
+  ): Promise<Product[]> {
+    const base = { phase: needs.phase, maxPowerW: { gte: needs.peakW } };
+    const [withReserve, withoutReserve] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { ...base, ratedPowerW: { gte: needs.recommendedW } },
+        include: productInclude,
+        orderBy: { ratedPowerW: 'asc' },
+        take,
+      }),
+      this.prisma.product.findMany({
+        where: {
+          ...base,
+          ratedPowerW: { gte: needs.runningW, lt: needs.recommendedW },
+        },
+        include: productInclude,
+        orderBy: { ratedPowerW: 'desc' },
+        take,
+      }),
+    ]);
+    return [...withReserve, ...withoutReserve].map((r) => this.toDto(r, segment));
   }
 
   async getBySlug(slug: string, segment: Segment = 'B2C'): Promise<Product> {

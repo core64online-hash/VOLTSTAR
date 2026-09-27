@@ -1,23 +1,15 @@
 import { z } from 'zod';
 import { CurrencySchema, DealStageSchema, OrgTypeSchema, RoleSchema, SegmentSchema } from './enums';
 import { LeadStatusSchema } from './crm';
+import { imageUrlField, powerWField, slugField } from './fields';
 import { FuelTypeSchema, PhaseTypeSchema } from './selector';
 
-const slug = z
-  .string()
-  .trim()
-  .min(2)
-  .max(120)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Лише латиниця в нижньому регістрі, цифри й дефіси');
+// Обмеження полів каталогу — спільні з масовим імпортом, див. ./fields.
+const slug = slugField;
 
 // ─────────────────────────── Каталог ───────────────────────────
 
-/** Лише http(s)-адреси: `z.string().url()` сам по собі пропускає `javascript:` тощо. */
-const imageUrl = z
-  .string()
-  .trim()
-  .url()
-  .regex(/^https?:\/\//i, 'Адреса зображення має починатися з http(s)://');
+const imageUrl = imageUrlField;
 
 export const ProductSpecInputSchema = z.object({
   key: z.string().trim().min(1).max(120),
@@ -34,8 +26,8 @@ export const AdminProductInputSchema = z
     categoryId: z.string().min(1),
     fuel: FuelTypeSchema,
     phase: PhaseTypeSchema,
-    ratedPowerW: z.number().int().positive().max(10_000_000),
-    maxPowerW: z.number().int().positive().max(10_000_000),
+    ratedPowerW: powerWField,
+    maxPowerW: powerWField,
     images: z.array(imageUrl).max(20).default([]),
     specs: z.array(ProductSpecInputSchema).max(100).default([]),
     stock: z.number().int().nonnegative().default(0),
@@ -56,8 +48,8 @@ export const AdminProductUpdateSchema = z
     categoryId: z.string().min(1).optional(),
     fuel: FuelTypeSchema.optional(),
     phase: PhaseTypeSchema.optional(),
-    ratedPowerW: z.number().int().positive().max(10_000_000).optional(),
-    maxPowerW: z.number().int().positive().max(10_000_000).optional(),
+    ratedPowerW: powerWField.optional(),
+    maxPowerW: powerWField.optional(),
     images: z.array(imageUrl).max(20).optional(),
     specs: z.array(ProductSpecInputSchema).max(100).optional(),
   })

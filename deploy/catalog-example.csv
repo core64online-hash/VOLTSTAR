@@ -1,0 +1,5 @@
+slug,name,brand,category,fuel,phase,ratedPowerW,maxPowerW,description,images,priceB2C,priceB2B,stock,"spec:Обʼєм бака, л","spec:Рівень шуму, дБ",spec:Запуск
+honda-eu22i,Honda EU22i,Honda,Інверторні генератори,INVERTER,SINGLE,1800,2200,"Тихий інверторний генератор для дому та виїздів.",https://example.com/img/eu22i.jpg,42990,39990,5,"3,6",48,Ручний
+generac-gp6500,Generac GP6500,Generac,Резервні генератори,PETROL,SINGLE,5500,6500,"Бензиновий генератор для резервного живлення будинку.",,31990,28990,12,"30,3",72,Ручний
+hyundai-dhy8000se,Hyundai DHY8000SE,Hyundai,Дизельні генератори,DIESEL,SINGLE,6000,6500,"Дизельний генератор з електростартером і шумозахисним кожухом.",,74990,69990,3,16,68,Електростартер
+cummins-c22d5,Cummins C22D5,Cummins,Промислові генератори,DIESEL,THREE,17600,22000,"Трифазна дизельна установка для виробництва.",,489990,459990,1,60,75,Автоматичний
