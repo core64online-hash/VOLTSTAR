@@ -74,3 +74,42 @@ export const DealStage = {
 } as const;
 export const DealStageSchema = z.nativeEnum(DealStage);
 export type DealStage = (typeof DealStage)[keyof typeof DealStage];
+
+// ──────────────── Домен: стартери й генератори до техніки ────────────────
+
+/** Що саме продаємо: агрегат у зборі, його вузол чи ремкомплект. */
+export const PartKind = {
+  STARTER: 'STARTER',
+  ALTERNATOR: 'ALTERNATOR',
+  COMPONENT: 'COMPONENT',
+  REPAIR_KIT: 'REPAIR_KIT',
+} as const;
+export const PartKindSchema = z.nativeEnum(PartKind);
+export type PartKind = (typeof PartKind)[keyof typeof PartKind];
+
+/** Стан агрегата. EXCHANGE — відновлений в обмін на старий, із заставою за обмінний фонд. */
+export const PartCondition = {
+  NEW: 'NEW',
+  REMANUFACTURED: 'REMANUFACTURED',
+  EXCHANGE: 'EXCHANGE',
+} as const;
+export const PartConditionSchema = z.nativeEnum(PartCondition);
+export type PartCondition = (typeof PartCondition)[keyof typeof PartCondition];
+
+/** Напрямок обертання з боку привода. */
+export const Rotation = {
+  CW: 'CW',
+  CCW: 'CCW',
+} as const;
+export const RotationSchema = z.nativeEnum(Rotation);
+export type Rotation = (typeof Rotation)[keyof typeof Rotation];
+
+/** Групи техніки, які обслуговує компанія. */
+export const MachineSegment = {
+  TRUCK: 'TRUCK',
+  CONSTRUCTION: 'CONSTRUCTION',
+  AGRICULTURAL: 'AGRICULTURAL',
+  MILITARY: 'MILITARY',
+} as const;
+export const MachineSegmentSchema = z.nativeEnum(MachineSegment);
+export type MachineSegment = (typeof MachineSegment)[keyof typeof MachineSegment];

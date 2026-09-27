@@ -1,10 +1,4 @@
-import type {
-  CatalogFacets,
-  EquipmentPreset,
-  PowerCalculation,
-  Product,
-  SelectorInput,
-} from '@voltstar/types';
+import type { CatalogFacets, LookupResult, Product } from '@voltstar/types';
 
 const PUBLIC_API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const IS_SERVER = typeof window === 'undefined';
@@ -68,7 +62,7 @@ export async function fetchProduct(slug: string, segment = 'B2C'): Promise<Produ
   return res.json();
 }
 
-/** Доступні бренди та типи палива для фільтрів каталогу. */
+/** Доступні бренди, типи агрегатів і групи техніки для фільтрів каталогу. */
 export async function fetchFacets(): Promise<CatalogFacets> {
   const res = await fetch(apiUrl('/catalog/facets'), {
     headers: serverHeaders(),
@@ -78,21 +72,16 @@ export async function fetchFacets(): Promise<CatalogFacets> {
   return res.json();
 }
 
-/** Пресети типової техніки для форми підбору. */
-export async function fetchPresets(): Promise<EquipmentPreset[]> {
-  const res = await fetch(apiUrl('/catalog/equipment-presets'), { cache: 'no-store' });
-  if (!res.ok) throw new Error(`presets request failed: ${res.status}`);
-  return res.json();
-}
-
-/** Розрахунок потужності генератора за формою підбору. */
-export async function calculatePower(input: SelectorInput): Promise<PowerCalculation> {
-  const res = await fetch(apiUrl('/selector/calculate'), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
+/**
+ * Пошук по крос-номеру — головний вхід у каталог. GET, тож відповідь кешується браузером і CDN
+ * так само, як каталог (заголовки ставить API); `cache` навмисно не перевизначаємо.
+ */
+export async function lookupByNumber(number: string, segment = 'B2C'): Promise<LookupResult> {
+  const qs = new URLSearchParams({ number, segment });
+  const res = await fetch(apiUrl(`/catalog/lookup?${qs.toString()}`), {
+    headers: serverHeaders(),
   });
-  if (!res.ok) throw new Error(`selector request failed: ${res.status}`);
+  if (!res.ok) throw new Error(`lookup request failed: ${res.status}`);
   return res.json();
 }
 

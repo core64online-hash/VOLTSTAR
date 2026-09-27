@@ -95,6 +95,9 @@ export class CheckoutService {
               quantity: l.quantity,
               unitPriceMinor: l.unitGrossMinor,
               vatRate: l.vatRate,
+              // Артикул фіксуємо на момент продажу: у відновлених агрегатів номер із часом
+              // змінюється, а в рахунку має лишитися той, за яким купували.
+              partNumberSnapshot: l.partNumber,
             })),
           },
           payments: {

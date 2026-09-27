@@ -49,7 +49,6 @@ function setup() {
           : [{ stage: 'PROPOSAL', _count: { _all: 2 }, _sum: { amountMinor: 4_000_00 } }],
       ),
     },
-    selectorRun: { count: vi.fn(async () => 10) },
   };
   return { svc: new AnalyticsService(prisma as unknown as PrismaService), prisma };
 }
@@ -86,11 +85,17 @@ describe('AnalyticsService', () => {
     expect(funnel.openPipeline.find((s) => s.stage === 'PROPOSAL')).toEqual({ stage: 'PROPOSAL', count: 2, amountMinor: 4_000_00 });
   });
 
-  it('конверсія підбору й межі періоду в запитах (UTC-півночі за Києвом)', async () => {
+  it('заявки на підбір по номеру й межі періоду в запитах (UTC-півночі за Києвом)', async () => {
     const { svc, prisma } = setup();
     const r = await svc.report({ from: '2026-09-01', to: '2026-09-30' }, NOW);
-    expect(r.selector).toEqual({ runs: 10, leads: 4, deals: 1, leadRate: 0.4 });
-    const call = (prisma.selectorRun.count.mock.calls as unknown as [{ where: { createdAt: { gte: Date; lt: Date } } }][])[0];
+    expect(r.partRequests).toEqual({ leads: 4, deals: 1, dealRate: 0.25 });
+
+    const call = (
+      prisma.lead.count.mock.calls as unknown as [
+        { where: { source?: unknown; createdAt: { gte: Date; lt: Date } } },
+      ][]
+    ).find((c) => c[0].where.source !== undefined)!;
+    expect(call[0].where.source).toEqual({ in: ['part-request', 'reman'] });
     const where = call[0].where.createdAt;
     expect(where.gte.toISOString()).toBe('2026-08-31T21:00:00.000Z');
     expect(where.lt.toISOString()).toBe('2026-09-30T21:00:00.000Z');

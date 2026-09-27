@@ -1,23 +1,49 @@
 import { z } from 'zod';
-import { CurrencySchema, DealStageSchema, OrgTypeSchema, RoleSchema, SegmentSchema } from './enums';
+import {
+  CurrencySchema,
+  DealStageSchema,
+  MachineSegmentSchema,
+  OrgTypeSchema,
+  PartConditionSchema,
+  PartKindSchema,
+  RoleSchema,
+  RotationSchema,
+  SegmentSchema,
+} from './enums';
 import { LeadStatusSchema } from './crm';
-import { FuelTypeSchema, PhaseTypeSchema } from './selector';
+import {
+  amperageField,
+  imageUrlField,
+  powerKwField,
+  slugField,
+  teethField,
+  voltageField,
+} from './fields';
+import { partNumberField } from './part-number';
 
-const slug = z
-  .string()
-  .trim()
-  .min(2)
-  .max(120)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Лише латиниця в нижньому регістрі, цифри й дефіси');
+// Обмеження полів каталогу — спільні з масовим імпортом, див. ./fields.
+const slug = slugField;
 
 // ─────────────────────────── Каталог ───────────────────────────
 
-/** Лише http(s)-адреси: `z.string().url()` сам по собі пропускає `javascript:` тощо. */
-const imageUrl = z
-  .string()
-  .trim()
-  .url()
-  .regex(/^https?:\/\//i, 'Адреса зображення має починатися з http(s)://');
+const imageUrl = imageUrlField;
+
+/** Крос-номер у формі адмінки: нормалізована форма рахується на боці API. */
+export const CrossReferenceInputSchema = z.object({
+  brand: z.string().trim().min(1).max(60),
+  number: partNumberField,
+});
+export type CrossReferenceInput = z.infer<typeof CrossReferenceInputSchema>;
+
+/** Прив'язка до техніки: модель шукається за машинною назвою, створюється за потреби. */
+export const ApplicationInputSchema = z.object({
+  machineModelId: z.string().min(1),
+  engine: z.string().trim().max(60).optional(),
+  yearFrom: z.number().int().min(1900).max(2100).optional(),
+  yearTo: z.number().int().min(1900).max(2100).optional(),
+  note: z.string().trim().max(200).optional(),
+});
+export type ApplicationInput = z.infer<typeof ApplicationInputSchema>;
 
 export const ProductSpecInputSchema = z.object({
   key: z.string().trim().min(1).max(120),
@@ -25,25 +51,28 @@ export const ProductSpecInputSchema = z.object({
 });
 
 /** Створення товару з адмін-панелі. */
-export const AdminProductInputSchema = z
-  .object({
-    slug,
-    name: z.string().trim().min(2).max(200),
-    description: z.string().trim().max(5000).optional(),
-    brandId: z.string().min(1),
-    categoryId: z.string().min(1),
-    fuel: FuelTypeSchema,
-    phase: PhaseTypeSchema,
-    ratedPowerW: z.number().int().positive().max(10_000_000),
-    maxPowerW: z.number().int().positive().max(10_000_000),
-    images: z.array(imageUrl).max(20).default([]),
-    specs: z.array(ProductSpecInputSchema).max(100).default([]),
-    stock: z.number().int().nonnegative().default(0),
-  })
-  .refine((p) => p.maxPowerW >= p.ratedPowerW, {
-    message: 'Пікова потужність не може бути меншою за номінальну',
-    path: ['maxPowerW'],
-  });
+export const AdminProductInputSchema = z.object({
+  slug,
+  partNumber: partNumberField,
+  name: z.string().trim().min(2).max(200),
+  description: z.string().trim().max(5000).optional(),
+  brandId: z.string().min(1),
+  categoryId: z.string().min(1),
+  kind: PartKindSchema,
+  condition: PartConditionSchema.default('NEW'),
+  voltage: voltageField.optional(),
+  powerKw: powerKwField.optional(),
+  amperageA: amperageField.optional(),
+  rotation: RotationSchema.optional(),
+  teeth: teethField.optional(),
+  /** Застава за старий агрегат при купівлі на обмін, копійки. */
+  coreDepositMinor: z.number().int().nonnegative().max(100_000_000).optional(),
+  images: z.array(imageUrl).max(20).default([]),
+  specs: z.array(ProductSpecInputSchema).max(100).default([]),
+  crossReferences: z.array(CrossReferenceInputSchema).max(200).default([]),
+  applications: z.array(ApplicationInputSchema).max(200).default([]),
+  stock: z.number().int().nonnegative().default(0),
+});
 export type AdminProductInput = z.infer<typeof AdminProductInputSchema>;
 
 /** Редагування: будь-яка підмножина полів (specs, якщо передано, замінюються повністю). */
@@ -54,12 +83,19 @@ export const AdminProductUpdateSchema = z
     description: z.string().trim().max(5000).nullable().optional(),
     brandId: z.string().min(1).optional(),
     categoryId: z.string().min(1).optional(),
-    fuel: FuelTypeSchema.optional(),
-    phase: PhaseTypeSchema.optional(),
-    ratedPowerW: z.number().int().positive().max(10_000_000).optional(),
-    maxPowerW: z.number().int().positive().max(10_000_000).optional(),
+    partNumber: partNumberField.optional(),
+    kind: PartKindSchema.optional(),
+    condition: PartConditionSchema.optional(),
+    voltage: voltageField.nullable().optional(),
+    powerKw: powerKwField.nullable().optional(),
+    amperageA: amperageField.nullable().optional(),
+    rotation: RotationSchema.nullable().optional(),
+    teeth: teethField.nullable().optional(),
+    coreDepositMinor: z.number().int().nonnegative().max(100_000_000).nullable().optional(),
     images: z.array(imageUrl).max(20).optional(),
     specs: z.array(ProductSpecInputSchema).max(100).optional(),
+    crossReferences: z.array(CrossReferenceInputSchema).max(200).optional(),
+    applications: z.array(ApplicationInputSchema).max(200).optional(),
   })
   .refine((p) => Object.keys(p).length > 0, { message: 'Немає змін' });
 export type AdminProductUpdate = z.infer<typeof AdminProductUpdateSchema>;
@@ -79,12 +115,24 @@ export const AdminProductSchema = z.object({
   description: z.string().nullable(),
   brand: z.object({ id: z.string(), name: z.string() }),
   category: z.object({ id: z.string(), name: z.string() }),
-  fuel: FuelTypeSchema,
-  phase: PhaseTypeSchema,
-  ratedPowerW: z.number().int(),
-  maxPowerW: z.number().int(),
+  partNumber: z.string(),
+  kind: PartKindSchema,
+  condition: PartConditionSchema,
+  voltage: z.number().int().nullable(),
+  powerKw: z.number().nullable(),
+  amperageA: z.number().int().nullable(),
+  rotation: RotationSchema.nullable(),
+  teeth: z.number().int().nullable(),
+  coreDepositMinor: z.number().int().nullable(),
   images: z.array(z.string()),
   specs: z.array(ProductSpecInputSchema),
+  crossReferences: z.array(CrossReferenceInputSchema),
+  applications: z.array(
+    ApplicationInputSchema.extend({
+      machineBrand: z.string(),
+      machineModel: z.string(),
+    }),
+  ),
   stock: z.number().int(),
   prices: z.array(
     z.object({
@@ -100,10 +148,18 @@ export const AdminProductSchema = z.object({
 });
 export type AdminProduct = z.infer<typeof AdminProductSchema>;
 
-/** Довідники для форм: бренди, категорії, прайс-листи. */
+/** Довідники для форм: бренди, категорії, прайс-листи, техніка. */
 export const CatalogRefsSchema = z.object({
   brands: z.array(z.object({ id: z.string(), name: z.string() })),
   categories: z.array(z.object({ id: z.string(), name: z.string() })),
+  machineModels: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      brand: z.string(),
+      segment: MachineSegmentSchema,
+    }),
+  ),
   priceLists: z.array(
     z.object({
       id: z.string(),
@@ -247,12 +303,12 @@ export const AnalyticsSchema = z.object({
       z.object({ stage: DealStageSchema, count: z.number().int(), amountMinor: z.number().int() }),
     ),
   }),
-  selector: z.object({
-    runs: z.number().int(),
+  /** Запити на підбір по номеру: скільки з них стали заявкою й угодою. */
+  partRequests: z.object({
     leads: z.number().int(),
     deals: z.number().int(),
-    /** Заявки з форми підбору / розрахунки. */
-    leadRate: z.number(),
+    /** Угоди / заявки. */
+    dealRate: z.number(),
   }),
 });
 export type Analytics = z.infer<typeof AnalyticsSchema>;

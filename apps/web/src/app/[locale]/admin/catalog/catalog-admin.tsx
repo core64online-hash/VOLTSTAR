@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   AdminProductInputSchema,
-  FuelType,
-  PhaseType,
+  PartCondition,
+  PartKind,
   Role,
+  Rotation,
   type AdminProduct,
   type CatalogRefs,
 } from '@voltstar/types';
@@ -82,7 +83,7 @@ export function CatalogAdmin() {
               <thead className="bg-neutral-50 text-neutral-500">
                 <tr>
                   <th className="px-3 py-2">{t('product')}</th>
-                  <th className="px-3 py-2">{t('power')}</th>
+                  <th className="px-3 py-2">{t('partNumber')}</th>
                   <th className="px-3 py-2 text-right">{t('retail')}</th>
                   <th className="px-3 py-2 text-right">{t('stock')}</th>
                 </tr>
@@ -104,8 +105,8 @@ export function CatalogAdmin() {
                           {p.brand.name} · {p.slug}
                         </p>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        {(p.ratedPowerW / 1000).toFixed(1)} кВт
+                      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
+                        {p.partNumber}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-right">
                         {price ? (
@@ -149,33 +150,55 @@ export function CatalogAdmin() {
 
 type Form = {
   slug: string;
+  partNumber: string;
   name: string;
   description: string;
   brandId: string;
   categoryId: string;
-  fuel: string;
-  phase: string;
-  ratedPowerW: string;
-  maxPowerW: string;
+  kind: string;
+  condition: string;
+  voltage: string;
+  powerKw: string;
+  amperageA: string;
+  rotation: string;
+  teeth: string;
+  /** Застава за старий агрегат, у гривнях (у БД — копійки). */
+  coreDeposit: string;
   images: string;
   specs: { key: string; value: string }[];
+  crossReferences: { brand: string; number: string }[];
+  applications: { machineModelId: string; engine: string }[];
   stock: string;
 };
 
+const num = (v: number | null | undefined): string => (v == null ? '' : String(v));
+
 const toForm = (p: AdminProduct | null, refs: CatalogRefs): Form => ({
   slug: p?.slug ?? '',
+  partNumber: p?.partNumber ?? '',
   name: p?.name ?? '',
   description: p?.description ?? '',
   brandId: p?.brand.id ?? refs.brands[0]?.id ?? '',
   categoryId: p?.category.id ?? refs.categories[0]?.id ?? '',
-  fuel: p?.fuel ?? FuelType.PETROL,
-  phase: p?.phase ?? PhaseType.SINGLE,
-  ratedPowerW: p ? String(p.ratedPowerW) : '',
-  maxPowerW: p ? String(p.maxPowerW) : '',
+  kind: p?.kind ?? PartKind.STARTER,
+  condition: p?.condition ?? PartCondition.NEW,
+  voltage: num(p?.voltage),
+  powerKw: num(p?.powerKw),
+  amperageA: num(p?.amperageA),
+  rotation: p?.rotation ?? '',
+  teeth: num(p?.teeth),
+  coreDeposit: p?.coreDepositMinor == null ? '' : String(p.coreDepositMinor / 100),
   images: p?.images.join('\n') ?? '',
   specs: p?.specs.length ? p.specs : [{ key: '', value: '' }],
+  crossReferences: p?.crossReferences ?? [],
+  applications:
+    p?.applications.map((a) => ({ machineModelId: a.machineModelId, engine: a.engine ?? '' })) ?? [],
   stock: p ? String(p.stock) : '0',
 });
+
+/** Порожнє поле — «не задано», а не нуль: невідома напруга не повинна ставати 0 В. */
+const numberOrUndefined = (v: string): number | undefined =>
+  v.trim() === '' ? undefined : Number(v);
 
 function ProductEditor({
   editing,
@@ -215,19 +238,27 @@ function ProductEditor({
     if (!f) return;
     const payload = {
       slug: f.slug.trim(),
+      partNumber: f.partNumber.trim(),
       name: f.name.trim(),
       description: f.description.trim() || undefined,
       brandId: f.brandId,
       categoryId: f.categoryId,
-      fuel: f.fuel,
-      phase: f.phase,
-      ratedPowerW: Number(f.ratedPowerW),
-      maxPowerW: Number(f.maxPowerW),
+      kind: f.kind,
+      condition: f.condition,
+      voltage: numberOrUndefined(f.voltage),
+      powerKw: numberOrUndefined(f.powerKw),
+      amperageA: numberOrUndefined(f.amperageA),
+      rotation: f.rotation || undefined,
+      teeth: numberOrUndefined(f.teeth),
+      coreDepositMinor:
+        f.coreDeposit.trim() === '' ? undefined : Math.round(Number(f.coreDeposit) * 100),
       images: f.images
         .split('\n')
         .map((s) => s.trim())
         .filter(Boolean),
       specs: f.specs.filter((s) => s.key.trim() && s.value.trim()),
+      crossReferences: f.crossReferences.filter((x) => x.brand.trim() && x.number.trim()),
+      applications: f.applications.filter((a) => a.machineModelId),
       stock: Number(f.stock || 0),
     };
     const parsed = AdminProductInputSchema.safeParse(payload);
@@ -261,7 +292,10 @@ function ProductEditor({
       {errors[key] && <span className="block text-xs text-red-600">{errors[key]}</span>}
     </label>
   );
-  const text = (key: 'slug' | 'name' | 'ratedPowerW' | 'maxPowerW', type = 'text') => (
+  const text = (
+    key: 'slug' | 'partNumber' | 'name' | 'voltage' | 'powerKw' | 'amperageA' | 'teeth' | 'coreDeposit',
+    type = 'text',
+  ) => (
     <input
       type={type}
       className={`${inputCls} mt-1 w-full`}
@@ -289,6 +323,7 @@ function ProductEditor({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">{field('name', t('name'), text('name'))}</div>
+        {field('partNumber', t('partNumber'), text('partNumber'))}
         {field('slug', t('slug'), text('slug'))}
         {field(
           'brandId',
@@ -323,39 +358,59 @@ function ProductEditor({
           </select>,
         )}
         {field(
-          'fuel',
-          t('fuel'),
+          'kind',
+          t('kind'),
           <select
             className={`${inputCls} mt-1 w-full`}
             disabled={readOnly}
-            value={f.fuel}
-            onChange={(e) => set('fuel', e.target.value)}
+            value={f.kind}
+            onChange={(e) => set('kind', e.target.value)}
           >
-            {Object.values(FuelType).map((x) => (
+            {Object.values(PartKind).map((x) => (
               <option key={x} value={x}>
-                {tCat(`fuels.${x}`)}
+                {tCat(`kinds.${x}`)}
               </option>
             ))}
           </select>,
         )}
         {field(
-          'phase',
-          t('phase'),
+          'condition',
+          t('condition'),
           <select
             className={`${inputCls} mt-1 w-full`}
             disabled={readOnly}
-            value={f.phase}
-            onChange={(e) => set('phase', e.target.value)}
+            value={f.condition}
+            onChange={(e) => set('condition', e.target.value)}
           >
-            {Object.values(PhaseType).map((x) => (
+            {Object.values(PartCondition).map((x) => (
               <option key={x} value={x}>
-                {tCat(`phases.${x}`)}
+                {tCat(`conditions.${x}`)}
               </option>
             ))}
           </select>,
         )}
-        {field('ratedPowerW', t('ratedPowerW'), text('ratedPowerW', 'number'))}
-        {field('maxPowerW', t('maxPowerW'), text('maxPowerW', 'number'))}
+        {field('voltage', t('voltage'), text('voltage', 'number'))}
+        {field('powerKw', t('powerKw'), text('powerKw', 'number'))}
+        {field('amperageA', t('amperageA'), text('amperageA', 'number'))}
+        {field('teeth', t('teeth'), text('teeth', 'number'))}
+        {field(
+          'rotation',
+          t('rotation'),
+          <select
+            className={`${inputCls} mt-1 w-full`}
+            disabled={readOnly}
+            value={f.rotation}
+            onChange={(e) => set('rotation', e.target.value)}
+          >
+            <option value="">—</option>
+            {Object.values(Rotation).map((x) => (
+              <option key={x} value={x}>
+                {tCat(`rotations.${x}`)}
+              </option>
+            ))}
+          </select>,
+        )}
+        {field('coreDeposit', t('coreDeposit'), text('coreDeposit', 'number'))}
         {!current &&
           field(
             'stock',
@@ -452,6 +507,141 @@ function ProductEditor({
           >
             + {t('addSpec')}
           </button>
+        )}
+      </fieldset>
+
+      <fieldset className="space-y-2">
+        <legend className="font-semibold">{t('crossReferences')}</legend>
+        {/* Крос-номери — те, за чим клієнт шукає; порожні рядки просто не зберігаються. */}
+        {f.crossReferences.map((x, i) => (
+          <div key={i} className="flex gap-2">
+            <input
+              className={`${inputCls} w-40`}
+              placeholder={t('xrefBrand')}
+              aria-label={`${t('xrefBrand')} ${i + 1}`}
+              disabled={readOnly}
+              value={x.brand}
+              onChange={(e) =>
+                set(
+                  'crossReferences',
+                  f.crossReferences.map((y, j) => (j === i ? { ...y, brand: e.target.value } : y)),
+                )
+              }
+            />
+            <input
+              className={`${inputCls} flex-1 font-mono`}
+              placeholder={t('xrefNumber')}
+              aria-label={`${t('xrefNumber')} ${i + 1}`}
+              disabled={readOnly}
+              value={x.number}
+              onChange={(e) =>
+                set(
+                  'crossReferences',
+                  f.crossReferences.map((y, j) => (j === i ? { ...y, number: e.target.value } : y)),
+                )
+              }
+            />
+            {!readOnly && (
+              <button
+                type="button"
+                aria-label={t('removeXref')}
+                className="text-red-600"
+                onClick={() =>
+                  set(
+                    'crossReferences',
+                    f.crossReferences.filter((_, j) => j !== i),
+                  )
+                }
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        {!readOnly && (
+          <button
+            type="button"
+            className={secondaryBtn}
+            onClick={() => set('crossReferences', [...f.crossReferences, { brand: '', number: '' }])}
+          >
+            + {t('addXref')}
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset className="space-y-2">
+        <legend className="font-semibold">{t('applications')}</legend>
+        {refs.machineModels.length === 0 ? (
+          <p className="text-neutral-500">{t('noMachineModels')}</p>
+        ) : (
+          <>
+            {f.applications.map((a, i) => (
+              <div key={i} className="flex gap-2">
+                <select
+                  className={`${inputCls} flex-1`}
+                  aria-label={`${t('machineModel')} ${i + 1}`}
+                  disabled={readOnly}
+                  value={a.machineModelId}
+                  onChange={(e) =>
+                    set(
+                      'applications',
+                      f.applications.map((y, j) =>
+                        j === i ? { ...y, machineModelId: e.target.value } : y,
+                      ),
+                    )
+                  }
+                >
+                  {refs.machineModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.brand} {m.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={`${inputCls} w-48`}
+                  placeholder={t('engine')}
+                  aria-label={`${t('engine')} ${i + 1}`}
+                  disabled={readOnly}
+                  value={a.engine}
+                  onChange={(e) =>
+                    set(
+                      'applications',
+                      f.applications.map((y, j) => (j === i ? { ...y, engine: e.target.value } : y)),
+                    )
+                  }
+                />
+                {!readOnly && (
+                  <button
+                    type="button"
+                    aria-label={t('removeApplication')}
+                    className="text-red-600"
+                    onClick={() =>
+                      set(
+                        'applications',
+                        f.applications.filter((_, j) => j !== i),
+                      )
+                    }
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {!readOnly && (
+              <button
+                type="button"
+                className={secondaryBtn}
+                onClick={() =>
+                  set('applications', [
+                    ...f.applications,
+                    { machineModelId: refs.machineModels[0].id, engine: '' },
+                  ])
+                }
+              >
+                + {t('addApplication')}
+              </button>
+            )}
+          </>
         )}
       </fieldset>
 

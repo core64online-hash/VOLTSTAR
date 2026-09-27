@@ -69,7 +69,7 @@ function Report({ data }: { data: Analytics }) {
   const locale = useLocale();
   const money = (minor: number) => formatPrice(minor, data.currency, `${locale}-UA`);
   const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
-  const { sales, funnel, selector } = data;
+  const { sales, funnel, partRequests } = data;
 
   const kpis = [
     {
@@ -90,9 +90,9 @@ function Report({ data }: { data: Analytics }) {
       hint: t('wonLost', { won: funnel.won.count, lost: funnel.lost.count }),
     },
     {
-      key: 'selectorRate',
-      value: pct(selector.leadRate),
-      hint: t('runsHint', { n: selector.runs }),
+      key: 'partRequestRate',
+      value: pct(partRequests.dealRate),
+      hint: t('partRequestsHint', { n: partRequests.leads }),
     },
   ];
 
@@ -213,13 +213,12 @@ function Report({ data }: { data: Analytics }) {
             })}
           </p>
         </Card>
-        <Card title={t('selector')}>
-          <ol className="space-y-2 text-sm" data-funnel="selector">
+        <Card title={t('partRequests')}>
+          <ol className="space-y-2 text-sm" data-funnel="partRequests">
             {(
               [
-                ['runs', selector.runs],
-                ['selectorLeads', selector.leads],
-                ['selectorDeals', selector.deals],
+                ['partRequestLeads', partRequests.leads],
+                ['partRequestDeals', partRequests.deals],
               ] as const
             ).map(([k, v], i, all) => (
               <li key={k} className="flex items-center justify-between gap-2">

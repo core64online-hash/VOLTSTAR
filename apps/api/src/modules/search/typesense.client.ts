@@ -61,8 +61,18 @@ export class TypesenseClient {
     return this.json('GET', '/health');
   }
 
-  createCollection(name: string, fields: CollectionField[], defaultSortingField?: string): Promise<unknown> {
-    return this.json('POST', '/collections', { name, fields, default_sorting_field: defaultSortingField });
+  createCollection(
+    name: string,
+    fields: CollectionField[],
+    defaultSortingField?: string,
+    tokenSeparators?: string[],
+  ): Promise<unknown> {
+    return this.json('POST', '/collections', {
+      name,
+      fields,
+      default_sorting_field: defaultSortingField,
+      ...(tokenSeparators ? { token_separators: tokenSeparators } : {}),
+    });
   }
 
   deleteCollection(name: string): Promise<unknown> {

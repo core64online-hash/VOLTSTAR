@@ -1,71 +1,103 @@
 /**
  * Демо-сідінг для локальної розробки VOLTSTAR.
  * Запуск: pnpm --filter @voltstar/api seed
+ *
+ * Дає рівно стільки даних, щоб пройти шлях клієнта: крос-номер у пошуку → товар → кошик.
+ * Реальний каталог наповнюється імпортом (`catalog:import`), а не звідси.
  */
 import { PrismaClient } from '@prisma/client';
+import { normalizePartNumber } from '@voltstar/types';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Бренди
-  const generac = await prisma.brand.upsert({
-    where: { slug: 'generac' },
+  const bosch = await prisma.brand.upsert({
+    where: { slug: 'bosch' },
     update: {},
-    create: { name: 'Generac', slug: 'generac' },
+    create: { name: 'Bosch', slug: 'bosch' },
   });
 
-  // Категорії
-  const backup = await prisma.category.upsert({
-    where: { slug: 'backup-generators' },
+  const starters = await prisma.category.upsert({
+    where: { slug: 'startery' },
     update: {},
-    create: { name: 'Резервні генератори', slug: 'backup-generators' },
+    create: { name: 'Стартери', slug: 'startery' },
   });
 
-  // Прайс-листи по сегментах
   const b2cList = await prisma.priceList.upsert({
     where: { segment_currency_name: { segment: 'B2C', currency: 'UAH', name: 'Роздріб' } },
     update: {},
     create: { name: 'Роздріб', segment: 'B2C', currency: 'UAH' },
   });
 
-  // Товар
+  const partNumber = '0001368088';
   const product = await prisma.product.upsert({
-    where: { slug: 'generac-gp3300' },
+    where: { partNumber },
     update: {},
     create: {
-      slug: 'generac-gp3300',
-      name: 'Generac GP3300',
-      description: 'Бензиновий генератор для резервного живлення.',
-      brandId: generac.id,
-      categoryId: backup.id,
-      fuel: 'PETROL',
-      phase: 'SINGLE',
-      ratedPowerW: 3300,
-      maxPowerW: 4000,
-      inventory: { create: { quantity: 12 } },
+      slug: 'bosch-0001368088',
+      name: 'Стартер Bosch 24V 6.6 кВт',
+      description: 'Відновлений стартер на двигуни ЯМЗ. Продається в обмін на старий агрегат.',
+      brandId: bosch.id,
+      categoryId: starters.id,
+      kind: 'STARTER',
+      condition: 'REMANUFACTURED',
+      partNumber,
+      partNumberNorm: normalizePartNumber(partNumber),
+      voltage: 24,
+      powerKw: 6.6,
+      rotation: 'CW',
+      teeth: 11,
+      coreDepositMinor: 300000,
+      inventory: { create: { quantity: 4 } },
     },
+  });
+
+  // Крос-номери — те, за чим клієнт шукає насправді.
+  for (const xref of [
+    { brand: 'BOSCH', number: '0 001 368 088' },
+    { brand: 'ISKRA', number: 'AZJ3151' },
+    { brand: 'ЯМЗ', number: '6582.3708000' },
+  ]) {
+    await prisma.crossReference.upsert({
+      where: {
+        productId_brand_numberNorm: {
+          productId: product.id,
+          brand: xref.brand,
+          numberNorm: normalizePartNumber(xref.number),
+        },
+      },
+      update: {},
+      create: { ...xref, productId: product.id, numberNorm: normalizePartNumber(xref.number) },
+    });
+  }
+
+  const maz = await prisma.machineBrand.upsert({
+    where: { slug: 'maz' },
+    update: {},
+    create: { name: 'МАЗ', slug: 'maz' },
+  });
+  const maz5440 = await prisma.machineModel.upsert({
+    where: { slug: 'maz-5440' },
+    update: {},
+    create: { brandId: maz.id, name: '5440', slug: 'maz-5440', segment: 'TRUCK' },
+  });
+  await prisma.productApplication.upsert({
+    where: {
+      productId_machineModelId_engine: {
+        productId: product.id,
+        machineModelId: maz5440.id,
+        engine: 'ЯМЗ-238',
+      },
+    },
+    update: {},
+    create: { productId: product.id, machineModelId: maz5440.id, engine: 'ЯМЗ-238' },
   });
 
   await prisma.price.upsert({
     where: { productId_priceListId: { productId: product.id, priceListId: b2cList.id } },
     update: {},
-    create: { productId: product.id, priceListId: b2cList.id, amountMinor: 1899000, vatRate: 0.2 },
+    create: { productId: product.id, priceListId: b2cList.id, amountMinor: 1450000, vatRate: 0.2 },
   });
-
-  // Пресети типової техніки для форми підбору
-  const presets = [
-    { label: 'Холодильник побутовий', powerW: 200, loadType: 'INDUCTIVE', category: 'Побут' },
-    { label: 'Обігрівач', powerW: 2000, loadType: 'RESISTIVE', category: 'Побут' },
-    { label: 'Насос свердловинний', powerW: 1100, loadType: 'MOTOR', category: 'Інженерія' },
-    { label: 'Комп’ютер', powerW: 400, loadType: 'ELECTRONIC', category: 'Офіс' },
-  ];
-  // Повторний запуск seed не дублює пресети (унікального ключа в таблиці немає — звіряємо за назвою).
-  const existing = new Set(
-    (await prisma.equipmentPreset.findMany({ select: { label: true } })).map((r) => r.label),
-  );
-  for (const p of presets) {
-    if (!existing.has(p.label)) await prisma.equipmentPreset.create({ data: p });
-  }
 
   console.log('Seed завершено ✅');
 }

@@ -176,6 +176,7 @@ function toDetail(o: OrderWithDetail): OrderDetail {
       productId: i.productId,
       slug: i.product.slug,
       name: i.product.name,
+      partNumber: i.partNumberSnapshot ?? i.product.partNumber,
       quantity: i.quantity,
       unitPriceMinor: i.unitPriceMinor,
       vatRate: i.vatRate,

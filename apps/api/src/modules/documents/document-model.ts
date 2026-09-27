@@ -21,7 +21,14 @@ export interface OrderSnapshot {
   contactEmail: string | null;
   contactPhone: string | null;
   organization: { name: string; edrpou: string | null } | null;
-  items: Array<{ name: string; quantity: number; unitPriceMinor: number; vatRate: number }>;
+  items: Array<{
+    name: string;
+    /** Артикул: у документі йде поряд із назвою, інакше по рахунку не звірити, що саме продали. */
+    partNumber?: string;
+    quantity: number;
+    unitPriceMinor: number;
+    vatRate: number;
+  }>;
 }
 
 export interface DocumentRow {
@@ -64,7 +71,12 @@ export function buildDocumentModel(
   order: OrderSnapshot,
   seller: SellerRequisites,
 ): DocumentModel {
-  const lines = order.items.map((i) => ({ name: i.name, quantity: i.quantity, gross: i.unitPriceMinor, vat: i.vatRate }));
+  const lines = order.items.map((i) => ({
+    name: i.partNumber ? `${i.name} (арт. ${i.partNumber})` : i.name,
+    quantity: i.quantity,
+    gross: i.unitPriceMinor,
+    vat: i.vatRate,
+  }));
   if (order.deliveryMinor > 0) {
     lines.push({ name: DELIVERY_LABEL[order.deliveryMethod], quantity: 1, gross: order.deliveryMinor, vat: DELIVERY_VAT_RATE });
   }

@@ -61,7 +61,7 @@ beforeAll(async () => {
         if (!coll) return send(404, { message: 'Not found' });
         const lines = body.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
         const out = lines.map((doc, i) => {
-          if (state.failImport && i === 0) return JSON.stringify({ success: false, error: 'Field `ratedPowerW` must be an int32.' });
+          if (state.failImport && i === 0) return JSON.stringify({ success: false, error: 'Field `voltage` must be an int32.' });
           coll.set(String(doc.id), { ...(coll.get(String(doc.id)) ?? {}), ...doc });
           return JSON.stringify({ success: true });
         });
@@ -73,7 +73,7 @@ beforeAll(async () => {
         const q = url.searchParams.get('q') ?? '*';
         const docs = [...coll.values()]
           .filter((d) => q === '*' || String(d.name).toLowerCase().includes(q.toLowerCase()))
-          .sort((a, b) => Number(a.ratedPowerW) - Number(b.ratedPowerW));
+          .sort((a, b) => String(a.name).localeCompare(String(b.name)));
         return send(200, { found: docs.length, page: 1, hits: docs.map((document) => ({ document })) });
       }
       send(404, { message: 'unknown route' });
@@ -93,8 +93,8 @@ beforeEach(() => {
 });
 
 const products = [
-  { id: 'p2', slug: 'b', name: 'Könner KS 8000', description: 'дизель', brand: { name: 'Könner', slug: 'konner' }, category: { slug: 'c' }, fuel: 'DIESEL', phase: 'THREE', ratedPowerW: 8000, maxPowerW: 9000, inventory: { quantity: 2 } },
-  { id: 'p1', slug: 'a', name: 'Generac GP3300', description: null, brand: { name: 'Generac', slug: 'generac' }, category: { slug: 'c' }, fuel: 'PETROL', phase: 'SINGLE', ratedPowerW: 3300, maxPowerW: 4000, inventory: null },
+  { id: 'p2', slug: 'b', name: 'Генератор Iskra 28V', description: 'на сільгосптехніку', brand: { name: 'Iskra', slug: 'iskra' }, category: { slug: 'c' }, kind: 'ALTERNATOR', condition: 'NEW', partNumberNorm: 'AAK5573', voltage: 28, crossReferences: [], applications: [], inventory: { quantity: 2 } },
+  { id: 'p1', slug: 'a', name: 'Стартер Bosch 24V', description: null, brand: { name: 'Bosch', slug: 'bosch' }, category: { slug: 'c' }, kind: 'STARTER', condition: 'REMANUFACTURED', partNumberNorm: '0001368088', voltage: 24, crossReferences: [{ numberNorm: 'AZJ3151' }], applications: [], inventory: null },
 ];
 
 function makeService(rows: Array<{ id: string } & Record<string, unknown>> = products) {
@@ -120,8 +120,8 @@ describe('SearchService ↔ Typesense HTTP API', () => {
     expect(state.aliases.get('products')).toBe(first.collection);
 
     const res = await service.searchProductIds({ page: 1, perPage: 24 });
-    expect(res).toEqual({ ids: ['p1', 'p2'], total: 2 });
-    expect((await service.searchProductIds({ q: 'könner', page: 1, perPage: 24 })).ids).toEqual(['p2']);
+    expect(res).toEqual({ ids: ['p2', 'p1'], total: 2 }); // «Генератор…» перед «Стартер…»
+    expect((await service.searchProductIds({ q: 'iskra', page: 1, perPage: 24 })).ids).toEqual(['p2']);
   });
 
   it('повторна переіндексація перемикає аліас і видаляє стару колекцію (без простою)', async () => {

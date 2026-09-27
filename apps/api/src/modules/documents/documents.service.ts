@@ -63,6 +63,8 @@ export class DocumentsService {
           : null,
         items: order.items.map((i) => ({
           name: i.product.name,
+          // Артикул на момент продажу; у старих замовленнях його немає — беремо поточний.
+          partNumber: i.partNumberSnapshot ?? i.product.partNumber,
           quantity: i.quantity,
           unitPriceMinor: i.unitPriceMinor,
           vatRate: i.vatRate,

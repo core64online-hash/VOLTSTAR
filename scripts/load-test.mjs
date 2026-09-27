@@ -4,7 +4,7 @@
  * перцентилі затримки, RPS і частка помилок; ненульовий код виходу, якщо пороги не виконано.
  *
  *   node scripts/load-test.mjs --api http://localhost:4000 --web http://localhost:3000 \
- *        --duration 30 --concurrency 20 [--scenarios catalog,product,search,facets,selector,web-catalog,web-product,checkout]
+ *        --duration 30 --concurrency 20 [--scenarios catalog,product,search,facets,lookup,web-catalog,web-product,checkout]
  *
  * Для API з увімкненими лімітами запитів (production) з однієї IP частина сценаріїв упреться
  * в 429 — запускайте проти стенду з RATE_LIMIT_DISABLED=true або з кількох машин.
@@ -17,8 +17,9 @@ const { values: args } = parseArgs({
     web: { type: 'string', default: 'http://localhost:3000' },
     duration: { type: 'string', default: '20' },
     concurrency: { type: 'string', default: '10' },
-    scenarios: { type: 'string', default: 'catalog,product,search,facets,selector,web-catalog,web-product,checkout' },
-    product: { type: 'string', default: 'generac-gp3300' },
+    scenarios: { type: 'string', default: 'catalog,product,search,facets,lookup,web-catalog,web-product,checkout' },
+    product: { type: 'string', default: 'bosch-0001368088' },
+    number: { type: 'string', default: '0 001 368 088' },
   },
 });
 const API = `${args.api.replace(/\/$/, '')}/api`;
@@ -38,27 +39,13 @@ let productId = null;
 /** Сценарії: одна «ітерація» = одна дія користувача; поріг p95 — у мс. */
 const SCENARIOS = {
   catalog: { p95: 300, run: async () => ok(await fetch(`${API}/catalog/products?perPage=24`)) },
-  search: { p95: 400, run: async () => ok(await fetch(`${API}/catalog/products?q=gen&fuel=PETROL&perPage=24`)) },
+  search: { p95: 400, run: async () => ok(await fetch(`${API}/catalog/products?q=starter&kind=STARTER&perPage=24`)) },
   product: { p95: 200, run: async () => ok(await fetch(`${API}/catalog/products/${args.product}`)) },
   facets: { p95: 200, run: async () => ok(await fetch(`${API}/catalog/facets`)) },
-  selector: {
+  // Пошук по крос-номеру — найчастіший запит у цій справі, тож і поріг найжорсткіший.
+  lookup: {
     p95: 200,
-    run: async () =>
-      ok(
-        await fetch(
-          `${API}/selector/calculate`,
-          json({
-            items: [
-              { label: 'Котел', powerW: 150, quantity: 1, loadType: 'ELECTRONIC', simultaneousStart: false },
-              { label: 'Холодильник', powerW: 200, quantity: 1, loadType: 'INDUCTIVE', simultaneousStart: true },
-              { label: 'Насос', powerW: 1100, quantity: 1, loadType: 'MOTOR', simultaneousStart: false },
-            ],
-            phase: 'SINGLE',
-            reserveFactor: 0.2,
-            usageMode: 'BACKUP',
-          }),
-        ),
-      ),
+    run: async () => ok(await fetch(`${API}/catalog/lookup?number=${encodeURIComponent(args.number)}`)),
   },
   'web-catalog': { p95: 800, run: async () => ok(await fetch(`${WEB}/uk/catalog`)) },
   'web-product': { p95: 300, run: async () => ok(await fetch(`${WEB}/uk/catalog/${args.product}`)) },

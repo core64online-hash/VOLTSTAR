@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { AccountDeletedNotice } from '../../components/account-deleted-notice';
+import { NumberSearch } from '../../components/number-search';
 import { jsonLd, localizedUrl, pageMetadata, SITE_NAME, SITE_URL } from '../../lib/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -47,7 +48,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             description: tMeta('description'),
             potentialAction: {
               '@type': 'SearchAction',
-              target: `${localizedUrl(locale, '/catalog')}?q={search_term_string}`,
+              target: `${localizedUrl(locale, '/lookup')}?number={search_term_string}`,
               'query-input': 'required name=search_term_string',
             },
           },
@@ -59,18 +60,23 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <p className="mb-3 text-sm font-semibold tracking-widest text-brand">VOLTSTAR</p>
           <h1 className="text-4xl font-bold sm:text-5xl">{t('title')}</h1>
           <p className="mx-auto mt-4 max-w-2xl text-neutral-300">{t('subtitle')}</p>
+          {/* Пошук по номеру — головний, а не один із рівноправних розділів: клієнт приходить
+              із номером на руках, і все інше йому потрібно вже потім. */}
+          <div className="mt-8">
+            <NumberSearch locale={locale} />
+          </div>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
-              href={p('/selector')}
+              href={p('/catalog')}
               className="rounded-lg bg-brand px-6 py-3 font-semibold text-black hover:bg-yellow-300"
             >
-              {t('ctaSelector')}
+              {t('ctaCatalog')}
             </Link>
             <Link
-              href={p('/catalog')}
+              href={p('/vidnovlennia')}
               className="rounded-lg border border-neutral-600 px-6 py-3 font-semibold hover:bg-neutral-800"
             >
-              {t('ctaCatalog')}
+              {tNav('reman')}
             </Link>
             <Link
               href={p('/business')}
@@ -97,7 +103,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       {/* Features */}
       <section className="mx-auto max-w-5xl px-4 py-16">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {[tFeat('selector'), tFeat('catalog'), tFeat('payment'), tFeat('crm')].map((f) => (
+          {[tFeat('lookup'), tFeat('reman'), tFeat('payment'), tFeat('crm')].map((f) => (
             <div key={f} className="rounded-xl border border-neutral-200 p-5">
               <p className="font-medium">{f}</p>
             </div>

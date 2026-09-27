@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type {
-  CatalogFacets,
-  CatalogQuery,
-  EquipmentPreset,
-  Product,
-  Segment,
+import {
+  normalizePartNumber,
+  type CatalogFacets,
+  type CatalogQuery,
+  type LookupQuery,
+  type LookupResult,
+  type Product,
+  type Segment,
 } from '@voltstar/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
@@ -16,6 +18,8 @@ const productInclude = {
   specs: true,
   inventory: true,
   prices: { include: { priceList: true } },
+  crossReferences: true,
+  applications: { include: { machineModel: { include: { brand: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductWithRelations = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
@@ -39,7 +43,10 @@ export class CatalogService {
     if (this.search.enabled) {
       try {
         const { ids, total } = await this.search.searchProductIds(query);
-        const rows = await this.prisma.product.findMany({ where: { id: { in: ids } }, include: productInclude });
+        const rows = await this.prisma.product.findMany({
+          where: { id: { in: ids } },
+          include: productInclude,
+        });
         const byId = new Map(rows.map((r) => [r.id, r]));
         const items = ids.flatMap((id) => {
           const row = byId.get(id);
@@ -53,29 +60,54 @@ export class CatalogService {
     return this.listFromDb(query, segment);
   }
 
+  private where(query: CatalogQuery): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {};
+
+    if (query.q) {
+      // У Postgres-відкаті шукаємо і за назвою, і за номерами: клієнт вводить номер,
+      // а не назву, і без Typesense він має знаходити так само.
+      const norm = normalizePartNumber(query.q);
+      where.OR = [
+        { name: { contains: query.q, mode: 'insensitive' } },
+        ...(norm.length >= 3
+          ? [
+              { partNumberNorm: { contains: norm } },
+              { crossReferences: { some: { numberNorm: { contains: norm } } } },
+            ]
+          : []),
+      ];
+    }
+    if (query.brand?.length) where.brand = { is: { slug: { in: query.brand } } };
+    if (query.kind?.length) where.kind = { in: query.kind };
+    if (query.condition?.length) where.condition = { in: query.condition };
+    if (query.voltage != null) where.voltage = query.voltage;
+    if (query.machineSegment || query.machineModel) {
+      where.applications = {
+        some: {
+          machineModel: {
+            is: {
+              ...(query.machineSegment ? { segment: query.machineSegment } : {}),
+              ...(query.machineModel ? { slug: query.machineModel } : {}),
+            },
+          },
+        },
+      };
+    }
+    if (query.inStock) where.inventory = { is: { quantity: { gt: 0 } } };
+    return where;
+  }
+
   private async listFromDb(
     query: CatalogQuery,
     segment: Segment,
   ): Promise<{ items: Product[]; total: number; page: number; perPage: number }> {
-    const where: Prisma.ProductWhereInput = {};
-
-    if (query.q) where.name = { contains: query.q, mode: 'insensitive' };
-    if (query.brand?.length) where.brand = { is: { slug: { in: query.brand } } };
-    if (query.fuel?.length) where.fuel = { in: query.fuel };
-    if (query.phase) where.phase = query.phase;
-    if (query.minPowerW != null || query.maxPowerW != null) {
-      where.ratedPowerW = {
-        ...(query.minPowerW != null ? { gte: query.minPowerW } : {}),
-        ...(query.maxPowerW != null ? { lte: query.maxPowerW } : {}),
-      };
-    }
-    if (query.inStock) where.inventory = { is: { quantity: { gt: 0 } } };
+    const where = this.where(query);
 
     const [rows, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
         include: productInclude,
-        orderBy: { ratedPowerW: 'asc' },
+        orderBy: { name: 'asc' },
         skip: (query.page - 1) * query.perPage,
         take: query.perPage,
       }),
@@ -90,25 +122,54 @@ export class CatalogService {
     };
   }
 
-  /** Доступні бренди та типи палива для фільтрів каталогу. */
+  /** Доступні значення для фільтрів каталогу. */
   async facets(): Promise<CatalogFacets> {
-    const [brands, fuels] = await Promise.all([
+    const [brands, kinds, conditions, segments] = await Promise.all([
       this.prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { slug: true, name: true } }),
-      this.prisma.product.findMany({ distinct: ['fuel'], select: { fuel: true } }),
+      this.prisma.product.findMany({ distinct: ['kind'], select: { kind: true } }),
+      this.prisma.product.findMany({ distinct: ['condition'], select: { condition: true } }),
+      this.prisma.machineModel.findMany({ distinct: ['segment'], select: { segment: true } }),
     ]);
-    return { brands, fuels: fuels.map((f) => f.fuel) };
+    return {
+      brands,
+      kinds: kinds.map((k) => k.kind),
+      conditions: conditions.map((c) => c.condition),
+      machineSegments: segments.map((s) => s.segment),
+    };
   }
 
-  /** Пресети типової техніки для форми підбору. */
-  async equipmentPresets(): Promise<EquipmentPreset[]> {
-    const rows = await this.prisma.equipmentPreset.findMany({ orderBy: { label: 'asc' } });
-    return rows.map((r) => ({
-      id: r.id,
-      label: r.label,
-      powerW: r.powerW,
-      loadType: r.loadType as EquipmentPreset['loadType'],
-      category: r.category,
-    }));
+  /**
+   * Пошук по крос-номеру — головний вхід у каталог: клієнт приходить із номером, знятим
+   * з агрегата або взятим із каталогу техніки, а не з описом того, що йому треба.
+   *
+   * Спершу точний збіг у Postgres: наш артикул або крос-номер у нормалізованій формі.
+   * Він покритий індексами, працює без Typesense і не залежить від того, як клієнт розставив
+   * пробіли й дефіси. Якщо точного збігу немає — віддаємо схоже з пошуку, але позначаємо
+   * результат як неточний: не той стартер гірший, ніж жодного.
+   */
+  async lookup(query: LookupQuery): Promise<LookupResult> {
+    const normalized = normalizePartNumber(query.number);
+
+    const exact = await this.prisma.product.findMany({
+      where: {
+        OR: [
+          { partNumberNorm: normalized },
+          { crossReferences: { some: { numberNorm: normalized } } },
+        ],
+      },
+      include: productInclude,
+      orderBy: { name: 'asc' },
+      take: query.limit,
+    });
+    if (exact.length > 0) {
+      return { normalized, match: 'exact', items: exact.map((r) => this.toDto(r, query.segment)) };
+    }
+
+    const { items } = await this.list(
+      { q: query.number, page: 1, perPage: query.limit },
+      query.segment,
+    );
+    return { normalized, match: items.length > 0 ? 'fuzzy' : 'none', items };
   }
 
   async getBySlug(slug: string, segment: Segment = 'B2C'): Promise<Product> {
@@ -134,13 +195,29 @@ export class CatalogService {
       name: row.name,
       brand: row.brand.name,
       categorySlug: row.category.slug,
-      fuel: row.fuel,
-      phase: row.phase,
-      ratedPowerW: row.ratedPowerW,
-      maxPowerW: row.maxPowerW,
+      kind: row.kind,
+      condition: row.condition,
+      partNumber: row.partNumber,
+      voltage: row.voltage,
+      // Decimal у Prisma — точний тип, у JSON віддаємо числом.
+      powerKw: row.powerKw === null ? null : Number(row.powerKw),
+      amperageA: row.amperageA,
+      rotation: row.rotation,
+      teeth: row.teeth,
+      coreDepositMinor: row.coreDepositMinor,
       images: row.images,
       inStock: (row.inventory?.quantity ?? 0) > 0,
       prices,
+      crossReferences: row.crossReferences.map((x) => ({ brand: x.brand, number: x.number })),
+      applications: row.applications.map((a) => ({
+        segment: a.machineModel.segment,
+        brand: a.machineModel.brand.name,
+        model: a.machineModel.name,
+        modelSlug: a.machineModel.slug,
+        engine: a.engine,
+        yearFrom: a.yearFrom,
+        yearTo: a.yearTo,
+      })),
     };
   }
 }

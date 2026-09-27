@@ -30,7 +30,8 @@ describe('segmentForSource', () => {
   it('запити бізнесу й держсектору — відповідні сегменти, решта — B2C', () => {
     expect(segmentForSource('b2b-request')).toBe('B2B');
     expect(segmentForSource('b2g-request')).toBe('B2G');
-    expect(segmentForSource('selector-form')).toBe('B2C');
+    expect(segmentForSource('part-request')).toBe('B2C');
+    expect(segmentForSource('reman')).toBe('B2C');
   });
 });
 

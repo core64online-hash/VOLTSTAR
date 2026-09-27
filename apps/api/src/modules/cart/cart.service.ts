@@ -137,6 +137,10 @@ export class CartService {
         productId: item.productId,
         slug: item.product.slug,
         name: item.product.name,
+        partNumber: item.product.partNumber,
+        ...(item.product.coreDepositMinor
+          ? { coreDepositMinor: item.product.coreDepositMinor }
+          : {}),
         quantity: item.quantity,
         unitGrossMinor: price.amountMinor,
         vatRate: price.vatRate,

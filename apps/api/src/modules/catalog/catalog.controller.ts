@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { CatalogQuerySchema, SegmentSchema, type Segment } from '@voltstar/types';
+import { CatalogQuerySchema, LookupQuerySchema, SegmentSchema, type Segment } from '@voltstar/types';
 import { PublicCache } from '../../common/http/public-cache.interceptor';
 import { CatalogService } from './catalog.service';
 
@@ -28,10 +28,11 @@ export class CatalogController {
     const query = CatalogQuerySchema.parse({
       q: q.q ? String(q.q) : undefined,
       brand: toArray(q.brand),
-      fuel: toArray(q.fuel),
-      phase: q.phase ? String(q.phase) : undefined,
-      minPowerW: toNumber(q.minPowerW),
-      maxPowerW: toNumber(q.maxPowerW),
+      kind: toArray(q.kind),
+      condition: toArray(q.condition),
+      machineSegment: q.machineSegment ? String(q.machineSegment) : undefined,
+      machineModel: q.machineModel ? String(q.machineModel) : undefined,
+      voltage: toNumber(q.voltage),
       inStock: q.inStock === 'true' ? true : undefined,
       page: toNumber(q.page) ?? 1,
       perPage: toNumber(q.perPage) ?? 24,
@@ -45,10 +46,19 @@ export class CatalogController {
     return this.catalog.facets();
   }
 
-  @Get('equipment-presets')
+  /**
+   * Пошук по крос-номеру. GET і без побічних ефектів — тому кешується так само, як решта
+   * каталогу: той самий номер у робочий день пробивають десятки разів.
+   */
+  @Get('lookup')
   @PublicCache()
-  presets() {
-    return this.catalog.equipmentPresets();
+  lookup(@Query() q: Record<string, unknown>) {
+    const query = LookupQuerySchema.parse({
+      number: String(q.number ?? ''),
+      segment: this.segment(q.segment),
+      limit: toNumber(q.limit) ?? 12,
+    });
+    return this.catalog.lookup(query);
   }
 
   @Get('products/:slug')

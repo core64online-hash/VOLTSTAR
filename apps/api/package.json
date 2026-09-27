@@ -15,6 +15,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "search:reindex": "tsx src/scripts/reindex-search.ts",
+    "catalog:import": "tsx src/scripts/import-catalog.ts",
     "user:role": "tsx src/scripts/set-role.ts",
     "data:retention": "tsx src/scripts/data-retention.ts"
   },

@@ -3,8 +3,10 @@
  * Єдине джерело правди для контрактів між фронтендом і бекендом.
  */
 export * from './enums';
-export * from './selector';
+export * from './fields';
+export * from './part-number';
 export * from './catalog';
+export * from './catalog-import';
 export * from './accounts';
 export * from './pricing';
 export * from './checkout';

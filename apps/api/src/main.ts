@@ -44,7 +44,7 @@ async function bootstrap() {
   if (!prod || process.env.SWAGGER_ENABLED === 'true') {
     const config = new DocumentBuilder()
       .setTitle('VOLTSTAR API')
-      .setDescription('API платформи підбору й продажу генераторів (B2C/B2B/B2G)')
+      .setDescription('API платформи продажу й відновлення стартерів і генераторів до техніки (B2C/B2B/B2G)')
       .setVersion('0.1.0')
       .addBearerAuth()
       .build();

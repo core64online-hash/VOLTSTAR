@@ -50,17 +50,25 @@ describe('AdminUsersService.setRole', () => {
 describe('AdminCatalogService', () => {
   const row = {
     id: 'p1',
-    slug: 'gp3300',
-    name: 'GP3300',
+    slug: 'bosch-0001368088',
+    name: 'Стартер Bosch 24V',
     description: null,
-    brand: { id: 'b1', name: 'Generac' },
-    category: { id: 'c1', name: 'Резервні' },
-    fuel: 'PETROL',
-    phase: 'SINGLE',
-    ratedPowerW: 3000,
-    maxPowerW: 3300,
+    brand: { id: 'b1', name: 'Bosch' },
+    category: { id: 'c1', name: 'Стартери' },
+    partNumber: '0001368088',
+    partNumberNorm: '0001368088',
+    kind: 'STARTER',
+    condition: 'REMANUFACTURED',
+    voltage: 24,
+    powerKw: null,
+    amperageA: null,
+    rotation: null,
+    teeth: null,
+    coreDepositMinor: null,
     images: [],
     specs: [],
+    crossReferences: [],
+    applications: [],
     inventory: { quantity: 4 },
     prices: [],
     updatedAt: new Date(),
@@ -76,6 +84,12 @@ describe('AdminCatalogService', () => {
       },
       brand: { findUnique: vi.fn(async () => ({ id: 'b1' })) },
       category: { findUnique: vi.fn(async () => ({ id: 'c1' })) },
+      machineModel: { count: vi.fn(async () => 1) },
+      crossReference: { deleteMany: vi.fn(async () => ({})), createMany: vi.fn(async () => ({})) },
+      productApplication: {
+        deleteMany: vi.fn(async () => ({})),
+        createMany: vi.fn(async () => ({})),
+      },
       inventoryItem: { upsert: vi.fn(async () => ({})) },
       $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
     };
@@ -84,26 +98,52 @@ describe('AdminCatalogService', () => {
     return { svc, prisma, search };
   }
   const input = {
-    slug: 'gp3300',
-    name: 'GP3300',
+    slug: 'bosch-0001368088',
+    partNumber: '0001368088',
+    name: 'Стартер Bosch 24V',
     brandId: 'b1',
     categoryId: 'c1',
-    fuel: 'PETROL' as const,
-    phase: 'SINGLE' as const,
-    ratedPowerW: 3000,
-    maxPowerW: 3300,
+    kind: 'STARTER' as const,
+    condition: 'REMANUFACTURED' as const,
     images: [],
     specs: [],
+    crossReferences: [],
+    applications: [],
     stock: 0,
   };
+
+  it('зайнятий артикул → 409 із поясненням', async () => {
+    const { svc, prisma } = setup();
+    prisma.product.create.mockImplementationOnce(async () => {
+      throw new Prisma.PrismaClientKnownRequestError('unique', {
+        code: 'P2002',
+        clientVersion: 'x',
+        meta: { target: ['partNumber'] },
+      });
+    });
+    await expect(svc.create(input)).rejects.toThrow(/артикулом/);
+  });
 
   it('зайнятий slug → 409 із поясненням', async () => {
     await expect(setup().svc.create(input)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('редагування: пікова потужність не менша за номінальну з урахуванням поточних значень', async () => {
+  it('нормалізована форма артикула рахується з нього, а не приймається ззовні', async () => {
     const { svc, prisma } = setup();
-    await expect(svc.update('p1', { maxPowerW: 2000 })).rejects.toThrow(/Пікова/);
+    await svc.update('p1', { partNumber: '0-001-368-099' });
+    expect(prisma.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { partNumber: '0-001-368-099', partNumberNorm: '0001368099' },
+      }),
+    );
+  });
+
+  it('невідома модель техніки → 400', async () => {
+    const { svc, prisma } = setup();
+    prisma.machineModel.count.mockResolvedValueOnce(0 as never);
+    await expect(
+      svc.update('p1', { applications: [{ machineModelId: 'nope' }] }),
+    ).rejects.toThrow(/техніки/);
     expect(prisma.product.update).not.toHaveBeenCalled();
   });
 

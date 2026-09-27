@@ -1,106 +1,102 @@
 {
   "meta": {
-    "title": "VOLTSTAR — generators for home and business",
-    "description": "Generator selection, catalog and online purchase. B2C · B2B · B2G."
+    "title": "VOLTSTAR — starters and alternators for heavy machinery",
+    "description": "Starters and alternators for trucks, construction, agricultural and military machinery. Cross-reference lookup, sales and remanufacturing."
   },
   "nav": {
     "catalog": "Catalog",
-    "selector": "Selector",
     "b2b": "For business",
     "contacts": "Contacts",
     "account": "Account",
-    "cart": "Cart"
+    "cart": "Cart",
+    "reman": "Remanufacturing"
   },
   "hero": {
-    "title": "A generator for any equipment",
-    "subtitle": "We calculate the required power and pick the optimal model from the most complete catalog.",
-    "ctaSelector": "Find a generator",
+    "title": "Starters and alternators for heavy machinery",
+    "subtitle": "Enter the number from your unit or from the machine catalogue and see what is in stock. Sales and remanufacturing.",
     "ctaCatalog": "Browse catalog"
   },
   "segments": {
     "title": "We serve every segment",
-    "b2c": { "title": "Private customers", "text": "Retail prices and instant online payment." },
-    "b2b": { "title": "Business", "text": "Wholesale prices, invoice payment, personal manager." },
-    "b2g": { "title": "Government", "text": "Tender document flow and reporting." }
+    "b2c": {
+      "title": "Private customers",
+      "text": "Retail prices and instant online payment."
+    },
+    "b2b": {
+      "title": "Business",
+      "text": "Wholesale prices, invoice payment, personal manager."
+    },
+    "b2g": {
+      "title": "Government",
+      "text": "Tender document flow and reporting."
+    }
   },
   "features": {
-    "selector": "Smart power-based selection",
-    "catalog": "The most complete generator catalog",
+    "lookup": "Lookup by cross-reference number",
+    "reman": "Remanufacturing of your own unit",
     "payment": "Secure online payment",
     "crm": "Support at every stage"
   },
-  "selector": {
-    "title": "Generator selector",
-    "subtitle": "Add your loads — we compute the required power, accounting for startup surge and reserve.",
-    "itemLabel": "Name",
-    "power": "Power, W",
-    "qty": "Qty",
-    "loadType": "Load type",
-    "simultaneous": "Simultaneous start",
-    "addItem": "Add load",
-    "remove": "Remove",
-    "params": "Parameters",
-    "phase": "Phases",
-    "reserve": "Reserve, %",
-    "mode": "Mode",
-    "calculate": "Calculate",
-    "calculating": "Calculating…",
-    "error": "Calculation failed. Make sure the API is running (http://localhost:4000).",
-    "loadTypes": {
-      "RESISTIVE": "Resistive (heater, lamp)",
-      "INDUCTIVE": "Inductive (fridge, pump)",
-      "MOTOR": "Motor (compressor)",
-      "ELECTRONIC": "Electronics (PC)"
-    },
-    "phases": { "SINGLE": "1 phase (230 V)", "THREE": "3 phase (400 V)" },
-    "modes": { "BACKUP": "Backup", "PRIME": "Prime", "MOBILE": "Mobile" },
-    "result": {
-      "title": "Recommendation",
-      "running": "Running power",
-      "peak": "Peak power",
-      "recommended": "Recommended power",
-      "kva": "Apparent power",
-      "cta": "Find in catalog"
-    },
-    "preset": { "add": "Quick-add equipment", "choose": "Pick from list…" },
-    "consult": {
-      "title": "Need advice?",
-      "text": "Leave your contacts — a manager will pick a specific model for your calculation and call you back."
-    }
-  },
   "catalog": {
-    "title": "Generator catalog",
+    "title": "Starter and alternator catalog",
     "empty": "No products found. Make sure the API and database are running and seeded (pnpm --filter @voltstar/api seed).",
     "inStock": "In stock",
     "outOfStock": "Out of stock",
-    "power": "Power",
-    "phase": "Phases",
-    "fuel": "Fuel",
     "from": "from",
     "details": "Details",
     "backToCatalog": "← Back to catalog",
-    "maxPower": "Peak power",
     "breadcrumbs": "Breadcrumbs",
     "specs": "Specifications",
     "notFound": "Product not found.",
+    "partNumber": "Part number",
+    "kind": "Type",
+    "condition": "Condition",
+    "voltage": "Voltage",
+    "volt": "V",
+    "powerKw": "Power",
+    "kw": "kW",
+    "amperage": "Output current",
+    "ampere": "A",
+    "rotation": "Rotation",
+    "teeth": "Pinion teeth",
+    "coreDeposit": "Core deposit",
+    "coreDepositHint": "refunded when you return your old unit",
+    "crossReferences": "Cross-reference numbers",
+    "crossReferencesHint": "Numbers for the same unit in manufacturer and machine catalogues — check against yours.",
+    "applications": "Fits the following machinery",
     "filters": {
-      "search": "Search by name",
-      "brand": "Brand",
-      "fuel": "Fuel",
-      "phase": "Phases",
+      "search": "Number or name",
+      "brand": "Manufacturer",
+      "kind": "Type",
+      "condition": "Condition",
+      "machineSegment": "Machinery",
+      "voltage": "Voltage",
       "inStock": "In stock only",
       "apply": "Apply",
       "reset": "Reset",
       "all": "All"
     },
-    "fuels": {
-      "PETROL": "Petrol",
-      "DIESEL": "Diesel",
-      "GAS": "Gas",
-      "DUAL_FUEL": "Dual fuel",
-      "INVERTER": "Inverter"
+    "kinds": {
+      "STARTER": "Starter",
+      "ALTERNATOR": "Alternator",
+      "COMPONENT": "Component",
+      "REPAIR_KIT": "Repair kit"
     },
-    "phases": { "SINGLE": "1 phase", "THREE": "3 phase" }
+    "conditions": {
+      "NEW": "New",
+      "REMANUFACTURED": "Remanufactured",
+      "EXCHANGE": "Exchange"
+    },
+    "rotations": {
+      "CW": "Clockwise",
+      "CCW": "Counter-clockwise"
+    },
+    "machineSegments": {
+      "TRUCK": "Trucks",
+      "CONSTRUCTION": "Construction machinery",
+      "AGRICULTURAL": "Agricultural machinery",
+      "MILITARY": "Military vehicles"
+    }
   },
   "account": {
     "email": "Email",
@@ -192,7 +188,8 @@
       "delivery": "Delivery",
       "free": "free",
       "vat": "incl. VAT",
-      "total": "Total"
+      "total": "Total",
+      "coreDeposit": "Core deposit (payable on handover)"
     },
     "checkout": {
       "title": "Checkout",
@@ -284,9 +281,9 @@
   },
   "business": {
     "title": "For business and public sector",
-    "subtitle": "We will match equipment to your site and prepare a quote, an invoice and the full document set.",
+    "subtitle": "We keep your fleet running: lookup by number, exchange stock, quotes, invoices and the full document set.",
     "benefits": {
-      "pricing": "Wholesale and custom pricing for companies",
+      "pricing": "Wholesale and custom pricing for fleets and farms",
       "invoice": "Bank-transfer invoices, VAT, delivery notes",
       "tender": "Tender and Prozorro procurement support"
     }
@@ -325,7 +322,8 @@
       "DISQUALIFIED": "Disqualified"
     },
     "sources": {
-      "selector-form": "Selector form",
+      "part-request": "Number lookup",
+      "reman": "Remanufacturing",
       "b2b-request": "Business request",
       "b2g-request": "Public sector request",
       "contact": "Contacts"
@@ -398,12 +396,11 @@
         "aov": "Average order",
         "paymentRate": "Paid of placed",
         "winRate": "Deals won",
-        "selectorRate": "Selector → request"
+        "partRequestRate": "Number request → deal"
       },
       "refunds": "refunded {sum}",
       "placed": "placed {n}",
       "wonLost": "won {won} · lost {lost}",
-      "runsHint": "calculations: {n}",
       "revenueByDay": "Revenue by day",
       "noSales": "No payments in this period.",
       "ordersN": "{n, plural, one {# order} other {# orders}}",
@@ -412,10 +409,10 @@
       "leads": "Leads in period: {n}",
       "pipeline": "Open deals",
       "closed": "Closed in period: won {won}, lost {lost}",
-      "selector": "Selector conversion",
-      "runs": "Calculations",
-      "selectorLeads": "Form requests",
-      "selectorDeals": "Deals"
+      "partRequestsHint": "requests: {n}",
+      "partRequests": "Lookup by number",
+      "partRequestLeads": "Requests",
+      "partRequestDeals": "Deals"
     },
     "orders": {
       "search": "Number, email, name or organization",
@@ -436,12 +433,11 @@
       "history": "Status history"
     },
     "catalog": {
-      "search": "Name, slug or brand",
+      "search": "Part number, cross-reference, name or brand",
       "find": "Search",
       "new": "New product",
       "empty": "No products found.",
       "product": "Product",
-      "power": "Power",
       "retail": "Retail",
       "stock": "Stock",
       "noPrice": "no price",
@@ -453,10 +449,6 @@
       "slug": "Slug (URL)",
       "brand": "Brand",
       "category": "Category",
-      "fuel": "Fuel",
-      "phase": "Phases",
-      "ratedPowerW": "Rated power, W",
-      "maxPowerW": "Peak power, W",
       "initialStock": "Initial stock",
       "description": "Description",
       "images": "Images (URLs, one per line)",
@@ -476,7 +468,27 @@
       "vat": "VAT",
       "vatFor": "VAT, {list}",
       "setPrice": "Set",
-      "removePrice": "Remove price"
+      "removePrice": "Remove price",
+      "partNumber": "Part number",
+      "kind": "Type",
+      "condition": "Condition",
+      "voltage": "Voltage, V",
+      "powerKw": "Power, kW",
+      "amperageA": "Output current, A",
+      "rotation": "Rotation",
+      "teeth": "Pinion teeth",
+      "coreDeposit": "Core deposit, UAH",
+      "crossReferences": "Cross-reference numbers",
+      "xrefBrand": "Manufacturer",
+      "xrefNumber": "Number",
+      "addXref": "Cross-reference",
+      "removeXref": "Remove cross-reference",
+      "applications": "Fits the following machinery",
+      "machineModel": "Machine model",
+      "engine": "Engine",
+      "addApplication": "Machine",
+      "removeApplication": "Remove machine",
+      "noMachineModels": "The machinery reference is empty — fill it via catalog import (fits: columns)."
     },
     "clients": {
       "orgsTitle": "Organizations awaiting verification",
@@ -575,10 +587,11 @@
     "accountDeleted": "Your account has been deleted. Thank you for being with us."
   },
   "seo": {
-    "catalog": "Generator catalog: petrol, diesel, gas and inverter. Filter by power, phases and brand, with current prices and stock.",
-    "selector": "Free online generator sizing that accounts for starting currents and reserve — for homes, cottages and businesses.",
-    "business": "Generators for business and the public sector: wholesale prices, VAT invoices, documents and Prozorro tender support.",
-    "product": "{name} ({brand}) — {power} kW, {fuel}, {phase}. {price}Buy online from VOLTSTAR with delivery across Ukraine.",
+    "catalog": "Catalog of starters and alternators for trucks, construction, agricultural and military machinery. Cross-reference lookup, new and remanufactured, prices and stock.",
+    "lookup": "Find a starter or alternator by cross-reference number: enter the number from the unit or the machine catalogue and see what is in stock.",
+    "reman": "Remanufacturing of starters and alternators for trucks, construction, agricultural and military machinery. Exchange stock and warranty.",
+    "business": "Starters and alternators for fleets, farms and the public sector: wholesale prices, VAT invoices, documents and Prozorro tender support.",
+    "product": "{name} ({brand}), part no. {partNumber} — {kind}, {condition}. {price}Buy online from VOLTSTAR with delivery across Ukraine.",
     "price": "Price {price}. ",
     "privacy": "How VOLTSTAR processes personal data: purposes, retention periods, your rights and contacts."
   },
@@ -590,5 +603,30 @@
     "text": "We couldn't display this page. The error has been reported. Please try again or go back to the home page.",
     "retry": "Try again",
     "home": "Home page"
+  },
+  "lookup": {
+    "title": "Lookup by number",
+    "label": "Starter or alternator number",
+    "placeholder": "e.g. 0 001 368 088 or AZJ3151",
+    "submit": "Search",
+    "exact": "Found by number {number}.",
+    "fuzzy": "No exact match for {number} — showing similar items. Check the numbers before ordering.",
+    "none": "Nothing found for number {number}.",
+    "noneHint": "We do not substitute “something similar”: the wrong unit is worse than none. Leave the number and we will check supplier catalogues and our exchange stock.",
+    "failed": "The search could not be completed. Check the number or try again.",
+    "browseCatalog": "Browse the whole catalog"
+  },
+  "reman": {
+    "title": "Starter and alternator remanufacturing",
+    "subtitle": "Do not scrap your unit: in most cases remanufacturing costs less than buying new.",
+    "steps": {
+      "title": "How it works",
+      "s1": "Send us the number from the unit and photos — we tell you whether we can take it and what it costs.",
+      "s2": "Bring or ship the unit. Inspection is free.",
+      "s3": "We replace worn parts, reassemble and test the unit under load on a test bench.",
+      "s4": "You get it back with a warranty. If you cannot wait, take one from the exchange stock and return yours later."
+    },
+    "formTitle": "Remanufacturing request",
+    "formHint": "Give the number from the unit’s plate and the make and model of the machine. If the number is illegible, describe the machine and we will find it."
   }
 }

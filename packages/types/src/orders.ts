@@ -69,6 +69,8 @@ export const OrderDetailSchema = OrderSummarySchema.extend({
       productId: z.string(),
       slug: z.string(),
       name: z.string(),
+      /** Артикул на момент продажу — у відновлених агрегатів номер із часом змінюється. */
+      partNumber: z.string(),
       quantity: z.number().int().positive(),
       unitPriceMinor: z.number().int().nonnegative(),
       vatRate: z.number(),
