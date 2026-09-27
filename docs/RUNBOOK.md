@@ -76,6 +76,18 @@ API — під `/api` (без CORS; вебхуки оплат — `https://<до
 | secret | `COOLIFY_TOKEN` | API-токен із п. 1.7 |
 | secret | `COOLIFY_STAGING_UUID` | UUID ресурсу staging |
 | secret | `COOLIFY_PRODUCTION_UUID` | UUID ресурсу production |
+| secret | `DEPLOY_PAT` | **необовʼязковий**, лише для відкату — див. нижче |
+
+**`COOLIFY_URL` і `COOLIFY_TOKEN` потрібні обом середовищам.** Якщо тримати їх в environment
+`staging`, job production їх не побачить і деплой упаде ще до звернення до Coolify (є окрема
+перевірка, яка каже, чого саме бракує, і **не чіпає гілку `production`**). Або кладіть їх на
+рівень репозиторію, або продублюйте в environment `production`.
+
+**`DEPLOY_PAT` — про відкат.** `GITHUB_TOKEN` не має права змінювати файли в
+`.github/workflows`, тож повернути гілку `production` на старий коміт, у якому цей файл
+інший, він не може — відкат у такому разі зупиняється й пише, що робити руками (у Coolify:
+ресурс production → Deployments → попередня збірка). Щоб відкат працював сам, додайте
+персональний токен зі scope `workflow` як секрет `DEPLOY_PAT`. Без нього все інше працює.
 
 `DEPLOY_ENABLED`, `STAGING_URL` і секрети staging можна тримати в environment `staging`, а
 `COOLIFY_PRODUCTION_UUID` — в environment `production`. **`PRODUCTION_URL` — лише на рівні репозиторію**
