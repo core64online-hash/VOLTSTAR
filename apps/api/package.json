@@ -16,6 +16,7 @@
     "seed": "tsx prisma/seed.ts",
     "search:reindex": "tsx src/scripts/reindex-search.ts",
     "catalog:import": "tsx src/scripts/import-catalog.ts",
+    "catalog:clear-demo": "tsx src/scripts/clear-demo.ts",
     "user:role": "tsx src/scripts/set-role.ts",
     "data:retention": "tsx src/scripts/data-retention.ts"
   },
