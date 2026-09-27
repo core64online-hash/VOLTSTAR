@@ -71,7 +71,7 @@ API — під `/api` (без CORS; вебхуки оплат — `https://<до
 |---|---|---|
 | variable | `DEPLOY_ENABLED` | `true` (без неї workflow деплою нічого не робить) |
 | variable | `STAGING_URL` | `https://staging.voltstar.ua` |
-| variable | `PRODUCTION_URL` | `https://voltstar.ua` — поки не задано, деплоїться лише staging |
+| variable | `PRODUCTION_URL` | `https://voltstar.ua` — потрібна лише для **автоматичного** деплою production після мержу |
 | secret | `COOLIFY_URL` | адреса вашого Coolify, напр. `https://mycoolify.pp.ua` |
 | secret | `COOLIFY_TOKEN` | API-токен із п. 1.7 |
 | secret | `COOLIFY_STAGING_UUID` | UUID ресурсу staging |
@@ -79,7 +79,13 @@ API — під `/api` (без CORS; вебхуки оплат — `https://<до
 
 `DEPLOY_ENABLED`, `STAGING_URL` і секрети staging можна тримати в environment `staging`, а
 `COOLIFY_PRODUCTION_UUID` — в environment `production`. **`PRODUCTION_URL` — лише на рівні репозиторію**
-(*Repository variables*): від неї залежить, чи запускати job production, а умова job бачить тільки їх.
+(*Repository variables*): від неї залежить, чи деплоїти production автоматично, а умова job бачить тільки їх.
+
+**Деплой production вручну — без цієї змінної.** *Actions → Deploy → Run workflow*, увімкнути
+«Задеплоїти production»; адреса для smoke береться з поля «Адреса production» (типово
+`https://voltstar.pp.ua`). Спершу як завжди їде staging і його smoke — production без зеленого
+staging не піде. Змінна лишається головною: доки її не задано, мерж у `main` бойовий домен
+не чіпає, і кожне оновлення production — явне рішення.
 
 ## 3. Як відбувається деплой
 

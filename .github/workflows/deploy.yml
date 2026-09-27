@@ -4,8 +4,14 @@ name: Deploy
 # production — після ручного підтвердження (environment «production» з обовʼязковими
 # рецензентами), зі smoke-тестами й автоматичним відкатом при провалі.
 #
+# Production запускається двома шляхами:
+#   • автоматично після мержу в main — лише якщо задано змінну PRODUCTION_URL;
+#   • вручну: Actions → Deploy → Run workflow → «Задеплоїти production» (змінна не потрібна).
+# Змінна лишається головною: вона єдине, що стримує автоматичний деплой на бойовий домен
+# після кожного зеленого CI, тому ручний прапорець свідомо окремий від неї.
+#
 # Увімкнення: Settings → Secrets and variables → Actions
-#   variables: DEPLOY_ENABLED=true, STAGING_URL, PRODUCTION_URL
+#   variables: DEPLOY_ENABLED=true, STAGING_URL, PRODUCTION_URL (лише для автодеплою)
 #   secrets:   COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_STAGING_UUID, COOLIFY_PRODUCTION_UUID
 # Докладно — docs/RUNBOOK.md.
 
@@ -29,6 +35,15 @@ on:
         description: "Адреса для smoke_only (типово — STAGING_URL)"
         required: false
         default: ""
+      production:
+        description: "Задеплоїти production (інакше — лише staging)"
+        type: boolean
+        required: false
+        default: false
+      production_url:
+        description: "Адреса production для smoke-тестів"
+        required: false
+        default: "https://voltstar.pp.ua"
 
 concurrency:
   group: deploy
@@ -84,8 +99,11 @@ jobs:
   production:
     name: Production
     needs: staging
-    # Production вмикається змінною PRODUCTION_URL (рівня репозиторію) — доти деплоїться лише staging.
-    if: needs.staging.outputs.enabled == 'true' && vars.PRODUCTION_URL != '' && !inputs.smoke_only
+    # Автоматичний деплой вмикається змінною PRODUCTION_URL (рівня репозиторію) — доти після
+    # мержу їде лише staging. Ручний запуск із прапорцем `production` працює і без неї.
+    if: >-
+      needs.staging.outputs.enabled == 'true' && !inputs.smoke_only
+      && (vars.PRODUCTION_URL != '' || inputs.production)
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -108,14 +126,15 @@ jobs:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
       - name: Smoke-тести production
         id: smoke
-        run: node scripts/smoke.mjs "${{ vars.PRODUCTION_URL }}" --version "${{ needs.staging.outputs.sha }}" --retries 100
+        # Змінна головна; вхід — запасний шлях для ручного запуску, коли змінної немає.
+        run: node scripts/smoke.mjs "${{ vars.PRODUCTION_URL || inputs.production_url }}" --version "${{ needs.staging.outputs.sha }}" --retries 100
       - name: Відкат на попередню версію
         if: failure() && steps.prev.outputs.sha != ''
         run: |
           echo "::error::Smoke-тести не пройдено — відкат на ${{ steps.prev.outputs.sha }}"
           git push origin "${{ steps.prev.outputs.sha }}:refs/heads/production" --force
           node scripts/coolify-deploy.mjs "${{ secrets.COOLIFY_PRODUCTION_UUID }}"
-          node scripts/smoke.mjs "${{ vars.PRODUCTION_URL }}" --version "${{ steps.prev.outputs.sha }}" --retries 100
+          node scripts/smoke.mjs "${{ vars.PRODUCTION_URL || inputs.production_url }}" --version "${{ steps.prev.outputs.sha }}" --retries 100
         env:
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}

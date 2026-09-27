@@ -1,4 +1,4 @@
-import type { CatalogFacets, LookupResult, Product } from '@voltstar/types';
+import type { CatalogFacets, LookupResult, MachineBrandGroup, Product } from '@voltstar/types';
 
 const PUBLIC_API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const IS_SERVER = typeof window === 'undefined';
@@ -69,6 +69,17 @@ export async function fetchFacets(): Promise<CatalogFacets> {
     next: { revalidate: CATALOG_REVALIDATE_SEC },
   });
   if (!res.ok) throw new Error(`facets request failed: ${res.status}`);
+  return res.json();
+}
+
+/** Техніка з товарами, згрупована за маркою. Без `segment` — уся, для карти сайту. */
+export async function fetchMachines(segment?: string): Promise<MachineBrandGroup[]> {
+  const qs = segment ? `?segment=${encodeURIComponent(segment)}` : '';
+  const res = await fetch(apiUrl(`/catalog/machines${qs}`), {
+    headers: serverHeaders(),
+    next: { revalidate: CATALOG_REVALIDATE_SEC },
+  });
+  if (!res.ok) throw new Error(`machines request failed: ${res.status}`);
   return res.json();
 }
 

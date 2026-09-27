@@ -143,3 +143,36 @@ describe('CatalogService.lookup', () => {
     expect(res).toMatchObject({ match: 'none', items: [] });
   });
 });
+
+describe('CatalogService.machines', () => {
+  it('групує моделі за маркою й бере лише ті, під які є товари', async () => {
+    const findMany = vi.fn(async (_args: { where: unknown }) => [
+      { slug: 'kraz-6322', name: '6322', segment: 'TRUCK', brand: { name: 'КрАЗ', slug: 'kraz' } },
+      { slug: 'maz-5440', name: '5440', segment: 'TRUCK', brand: { name: 'МАЗ', slug: 'maz' } },
+      { slug: 'maz-6430', name: '6430', segment: 'TRUCK', brand: { name: 'МАЗ', slug: 'maz' } },
+    ]);
+    const prisma = { machineModel: { findMany } };
+    const service = new CatalogService(prisma as never, { enabled: false, warn: vi.fn() } as never);
+
+    const groups = await service.machines('TRUCK');
+    expect(groups.map((g) => [g.brandSlug, g.models.map((m) => m.slug)])).toEqual([
+      ['kraz', ['kraz-6322']],
+      ['maz', ['maz-5440', 'maz-6430']],
+    ]);
+
+    // Порожні моделі відсікаються в запиті, а не після нього.
+    expect(findMany.mock.calls[0]![0].where).toEqual({
+      segment: 'TRUCK',
+      applications: { some: {} },
+    });
+  });
+
+  it('без групи техніки віддає всю техніку — для карти сайту', async () => {
+    const findMany = vi.fn(async (_args: { where: unknown }) => []);
+    const prisma = { machineModel: { findMany } };
+    const service = new CatalogService(prisma as never, { enabled: false, warn: vi.fn() } as never);
+
+    await service.machines();
+    expect(findMany.mock.calls[0]![0].where).toEqual({ applications: { some: {} } });
+  });
+});
