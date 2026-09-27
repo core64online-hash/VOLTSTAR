@@ -1,6 +1,12 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { CatalogQuerySchema, LookupQuerySchema, SegmentSchema, type Segment } from '@voltstar/types';
+import {
+  CatalogQuerySchema,
+  LookupQuerySchema,
+  MachineSegmentSchema,
+  SegmentSchema,
+  type Segment,
+} from '@voltstar/types';
 import { PublicCache } from '../../common/http/public-cache.interceptor';
 import { CatalogService } from './catalog.service';
 
@@ -59,6 +65,14 @@ export class CatalogController {
       limit: toNumber(q.limit) ?? 12,
     });
     return this.catalog.lookup(query);
+  }
+
+  /** Техніка з товарами — для посадкових сторінок і карти сайту. */
+  @Get('machines')
+  @PublicCache()
+  machines(@Query('segment') segment?: string) {
+    const parsed = MachineSegmentSchema.safeParse(segment);
+    return this.catalog.machines(parsed.success ? parsed.data : undefined);
   }
 
   @Get('products/:slug')

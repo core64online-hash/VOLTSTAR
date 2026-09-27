@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   CurrencySchema,
   MachineSegmentSchema,
+  type MachineSegment,
   PartConditionSchema,
   PartKindSchema,
   RotationSchema,
@@ -118,3 +119,36 @@ export const LookupResultSchema = z.object({
   items: z.array(ProductSchema),
 });
 export type LookupResult = z.infer<typeof LookupResultSchema>;
+
+/**
+ * Адреси груп техніки. Енум у шляху виглядав би як `/technika/TRUCK` — для пошукових систем
+ * і для людини це гірше, ніж `/technika/vantazhivky`, тому тримаємо явну відповідність.
+ */
+export const MACHINE_SEGMENT_SLUG: Record<MachineSegment, string> = {
+  TRUCK: 'vantazhivky',
+  CONSTRUCTION: 'spetstekhnika',
+  AGRICULTURAL: 'silhosptekhnika',
+  MILITARY: 'miltekhnika',
+};
+
+/** Група техніки за адресою; `null` — невідома адреса (сторінка має віддати 404). */
+export function machineSegmentBySlug(slug: string): MachineSegment | null {
+  const found = Object.entries(MACHINE_SEGMENT_SLUG).find(([, s]) => s === slug);
+  return found ? (found[0] as MachineSegment) : null;
+}
+
+/** Модель техніки в переліку застосовності. */
+export const MachineModelSummarySchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  segment: MachineSegmentSchema,
+});
+export type MachineModelSummary = z.infer<typeof MachineModelSummarySchema>;
+
+/** Моделі, згруповані за маркою техніки — для сторінки групи й карти сайту. */
+export const MachineBrandGroupSchema = z.object({
+  brand: z.string(),
+  brandSlug: z.string(),
+  models: z.array(MachineModelSummarySchema),
+});
+export type MachineBrandGroup = z.infer<typeof MachineBrandGroupSchema>;

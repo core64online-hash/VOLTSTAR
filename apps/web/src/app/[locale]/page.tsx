@@ -73,6 +73,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               {t('ctaCatalog')}
             </Link>
             <Link
+              href={p('/technika')}
+              className="rounded-lg border border-neutral-600 px-6 py-3 font-semibold hover:bg-neutral-800"
+            >
+              {tNav('machines')}
+            </Link>
+            <Link
               href={p('/vidnovlennia')}
               className="rounded-lg border border-neutral-600 px-6 py-3 font-semibold hover:bg-neutral-800"
             >

@@ -6,6 +6,8 @@ import {
   type CatalogQuery,
   type LookupQuery,
   type LookupResult,
+  type MachineBrandGroup,
+  type MachineSegment,
   type Product,
   type Segment,
 } from '@voltstar/types';
@@ -170,6 +172,36 @@ export class CatalogService {
       query.segment,
     );
     return { normalized, match: items.length > 0 ? 'fuzzy' : 'none', items };
+  }
+
+  /**
+   * Техніка, під яку в каталозі є агрегати, згрупована за маркою — для посадкових сторінок
+   * і карти сайту. Моделі без жодного товару не віддаємо: сторінка під них була б порожньою,
+   * а в індексі пошуковика — сміттям.
+   */
+  async machines(segment?: MachineSegment): Promise<MachineBrandGroup[]> {
+    const rows = await this.prisma.machineModel.findMany({
+      where: { ...(segment ? { segment } : {}), applications: { some: {} } },
+      select: {
+        slug: true,
+        name: true,
+        segment: true,
+        brand: { select: { name: true, slug: true } },
+      },
+      orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
+    });
+
+    const groups = new Map<string, MachineBrandGroup>();
+    for (const r of rows) {
+      const group = groups.get(r.brand.slug) ?? {
+        brand: r.brand.name,
+        brandSlug: r.brand.slug,
+        models: [],
+      };
+      group.models.push({ slug: r.slug, name: r.name, segment: r.segment });
+      groups.set(r.brand.slug, group);
+    }
+    return [...groups.values()];
   }
 
   async getBySlug(slug: string, segment: Segment = 'B2C'): Promise<Product> {

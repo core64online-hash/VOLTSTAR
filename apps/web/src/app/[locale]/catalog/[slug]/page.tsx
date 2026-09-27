@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import type { Product } from '@voltstar/types';
+import { MACHINE_SEGMENT_SLUG, type Product } from '@voltstar/types';
 import { fetchProduct, formatPrice } from '../../../../lib/api';
 import { jsonLd, localizedUrl, pageMetadata, SITE_NAME } from '../../../../lib/seo';
 import { AddToCartButton } from './add-to-cart';
@@ -144,7 +144,7 @@ export default async function ProductPage({ params }: Params) {
               {product.applications.map((a, i) => (
                 <li key={i} className="rounded-lg border border-neutral-200 p-3">
                   <Link
-                    href={`/${locale}/catalog?machineModel=${encodeURIComponent(a.modelSlug)}`}
+                    href={`/${locale}/technika/${MACHINE_SEGMENT_SLUG[a.segment]}/${a.modelSlug}`}
                     className="font-medium hover:underline"
                   >
                     {a.brand} {a.model}

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import type { Product } from '@voltstar/types';
+import { MACHINE_SEGMENT_SLUG, MachineSegment, type MachineBrandGroup, type Product } from '@voltstar/types';
 import { routing } from '../i18n/routing';
 import { apiUrl, serverHeaders } from '../lib/api';
 import { localizedUrl } from '../lib/seo';
@@ -15,6 +15,12 @@ const STATIC_PAGES: {
   { path: '', priority: 1, changeFrequency: 'weekly' },
   { path: '/catalog', priority: 0.9, changeFrequency: 'daily' },
   { path: '/vidnovlennia', priority: 0.8, changeFrequency: 'monthly' },
+  { path: '/technika', priority: 0.8, changeFrequency: 'weekly' },
+  ...Object.values(MachineSegment).map((s) => ({
+    path: `/technika/${MACHINE_SEGMENT_SLUG[s]}`,
+    priority: 0.7,
+    changeFrequency: 'weekly' as const,
+  })),
   { path: '/business', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/privacy', priority: 0.2, changeFrequency: 'yearly' },
 ];
@@ -42,8 +48,21 @@ async function allProducts(): Promise<Product[]> {
   return out;
 }
 
+/** Техніка з товарами. Якщо API недоступний — карта без цих сторінок, а не помилка. */
+async function allMachines(): Promise<MachineBrandGroup[]> {
+  try {
+    const res = await fetch(apiUrl('/catalog/machines'), {
+      headers: serverHeaders(),
+      next: { revalidate },
+    });
+    return res.ok ? ((await res.json()) as MachineBrandGroup[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const products = await allProducts();
+  const [products, machines] = await Promise.all([allProducts(), allMachines()]);
   const entries: MetadataRoute.Sitemap = [];
   for (const locale of routing.locales) {
     for (const p of STATIC_PAGES) {
@@ -62,6 +81,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
         alternates: { languages: languagesFor(path) },
       });
+    }
+    for (const group of machines) {
+      for (const model of group.models) {
+        const path = `/technika/${MACHINE_SEGMENT_SLUG[model.segment]}/${model.slug}`;
+        entries.push({
+          url: localizedUrl(locale, path),
+          changeFrequency: 'weekly',
+          priority: 0.7,
+          alternates: { languages: languagesFor(path) },
+        });
+      }
     }
   }
   return entries;

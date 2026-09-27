@@ -9,7 +9,8 @@
     "contacts": "Contacts",
     "account": "Account",
     "cart": "Cart",
-    "reman": "Remanufacturing"
+    "reman": "Remanufacturing",
+    "machines": "Machinery"
   },
   "hero": {
     "title": "Starters and alternators for heavy machinery",
@@ -593,7 +594,8 @@
     "business": "Starters and alternators for fleets, farms and the public sector: wholesale prices, VAT invoices, documents and Prozorro tender support.",
     "product": "{name} ({brand}), part no. {partNumber} — {kind}, {condition}. {price}Buy online from VOLTSTAR with delivery across Ukraine.",
     "price": "Price {price}. ",
-    "privacy": "How VOLTSTAR processes personal data: purposes, retention periods, your rights and contacts."
+    "privacy": "How VOLTSTAR processes personal data: purposes, retention periods, your rights and contacts.",
+    "machines": "Starters and alternators by machine make and model: trucks, construction, agricultural and military machinery."
   },
   "a11y": {
     "skipToContent": "Skip to main content"
@@ -628,5 +630,17 @@
     },
     "formTitle": "Remanufacturing request",
     "formHint": "Give the number from the unit’s plate and the make and model of the machine. If the number is illegible, describe the machine and we will find it."
+  },
+  "machines": {
+    "title": "Machinery",
+    "subtitle": "Cannot read the number on the unit? Search by your machine instead.",
+    "segmentTitle": "Starters and alternators: {segment}",
+    "segmentDescription": "Makes and models ({segment}) we carry starters and alternators for.",
+    "modelTitle": "Starters and alternators for {machine}",
+    "modelDescription": "Starters and alternators for {machine}: new and remanufactured, with cross-reference numbers, prices and stock.",
+    "found": "Items found: {n}",
+    "empty": "Nothing in the catalog for this machine yet. Leave a request and we will find it by number or by machine.",
+    "preferNumber": "One machine model comes with different engines, so searching by the number on the unit is more precise.",
+    "preferNumberLink": "Lookup by number"
   }
 }
