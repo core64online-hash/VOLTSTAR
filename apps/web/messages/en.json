@@ -97,7 +97,10 @@
       "CONSTRUCTION": "Construction machinery",
       "AGRICULTURAL": "Agricultural machinery",
       "MILITARY": "Military vehicles"
-    }
+    },
+    "priceOnRequest": "Price on request",
+    "priceOnRequestHint": "The part is in the catalogue; a manager will quote it — leave your contacts.",
+    "priceOnRequestCta": "Request a price"
   },
   "account": {
     "email": "Email",
@@ -327,7 +330,8 @@
       "reman": "Remanufacturing",
       "b2b-request": "Business request",
       "b2g-request": "Public sector request",
-      "contact": "Contacts"
+      "contact": "Contacts",
+      "price-request": "Price request"
     },
     "stages": {
       "NEW": "New",

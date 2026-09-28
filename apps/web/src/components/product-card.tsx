@@ -33,9 +33,15 @@ export function ProductCard({ product, locale }: { product: Product; locale: str
           <span className="text-neutral-500">{t('outOfStock')}</span>
         )}
       </span>
-      {price && (
+      {/* Каталоги застосовності приходять без цін — мовчазна картка виглядала б як поламана,
+          тому замість порожнечі кажемо, що ціну назве менеджер. */}
+      {price ? (
         <span className="mt-3 text-lg font-bold text-brand-dark">
           {t('from')} {formatPrice(price.amountMinor, price.currency, `${locale}-UA`)}
+        </span>
+      ) : (
+        <span className="mt-3 text-lg font-semibold text-neutral-700">
+          {t('priceOnRequest')}
         </span>
       )}
     </Link>

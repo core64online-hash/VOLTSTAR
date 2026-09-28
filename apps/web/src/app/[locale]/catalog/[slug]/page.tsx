@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { MACHINE_SEGMENT_SLUG, type Product } from '@voltstar/types';
+import { LeadSource, MACHINE_SEGMENT_SLUG, type Product } from '@voltstar/types';
+import { LeadForm } from '../../../../components/lead-form';
 import { fetchProduct, formatPrice } from '../../../../lib/api';
 import { jsonLd, localizedUrl, pageMetadata, SITE_NAME } from '../../../../lib/seo';
 import { AddToCartButton } from './add-to-cart';
@@ -104,10 +105,12 @@ export default async function ProductPage({ params }: Params) {
           )}
         </p>
 
-        {price && (
+        {price ? (
           <p className="mt-4 text-2xl font-bold text-brand-dark">
             {formatPrice(price.amountMinor, price.currency, `${locale}-UA`)}
           </p>
+        ) : (
+          <p className="mt-4 text-2xl font-bold text-neutral-800">{t('priceOnRequest')}</p>
         )}
 
         {/* Застава за старий агрегат — окремою сумою, а не в ціні: клієнт має бачити, скільки
@@ -120,7 +123,24 @@ export default async function ProductPage({ params }: Params) {
           </p>
         )}
 
-        <AddToCartButton productId={product.id} disabled={!product.inStock || !price} />
+        {/* Каталог застосовності дає характеристики й номери, але не ціни. Без ціни кнопка
+            «в кошик» була б мертвою, тому на її місці — заявка: клієнт знайшов потрібний
+            агрегат, лишилося назвати ціну. */}
+        {price ? (
+          <AddToCartButton productId={product.id} disabled={!product.inStock} />
+        ) : (
+          <section className="mt-6 rounded-xl border border-neutral-200 p-5">
+            <h2 className="text-lg font-semibold">{t('priceOnRequestCta')}</h2>
+            <p className="mt-1 text-sm text-neutral-600">{t('priceOnRequestHint')}</p>
+            <div className="mt-4">
+              <LeadForm
+                source={LeadSource.PRICE_REQUEST}
+                payload={{ partNumber: product.partNumber, slug: product.slug }}
+                defaultMessage={`${product.name} (${product.partNumber})`}
+              />
+            </div>
+          </section>
+        )}
 
         {product.crossReferences.length > 0 && (
           <section className="mt-10">

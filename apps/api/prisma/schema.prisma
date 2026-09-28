@@ -499,7 +499,7 @@ model Contact {
 
 model Lead {
   id          String     @id @default(cuid())
-  source      String     // part-request | reman | b2b-request | b2g-request | contact
+  source      String     // part-request | price-request | reman | b2b-request | b2g-request | contact
   status      LeadStatus @default(NEW)
   segment     Segment    @default(B2C)
   name        String?

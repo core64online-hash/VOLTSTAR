@@ -97,7 +97,10 @@
       "CONSTRUCTION": "Спецтехніка",
       "AGRICULTURAL": "Сільгосптехніка",
       "MILITARY": "Мілтехніка"
-    }
+    },
+    "priceOnRequest": "Ціна за запитом",
+    "priceOnRequestHint": "Товар є в каталозі, ціну назве менеджер — лишіть контакти.",
+    "priceOnRequestCta": "Дізнатися ціну"
   },
   "account": {
     "email": "Email",
@@ -327,7 +330,8 @@
       "reman": "Відновлення",
       "b2b-request": "Запит бізнесу",
       "b2g-request": "Запит держсектору",
-      "contact": "Контакти"
+      "contact": "Контакти",
+      "price-request": "Запит ціни"
     },
     "stages": {
       "NEW": "Нова",
