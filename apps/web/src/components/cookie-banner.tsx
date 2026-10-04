@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { getConsent, OPEN_CONSENT_EVENT, saveConsent } from '../lib/consent';
@@ -10,6 +10,7 @@ export function CookieBanner() {
   const t = useTranslations('privacy.banner');
   const locale = useLocale();
   const [open, setOpen] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setOpen(getConsent() === null);
@@ -18,6 +19,23 @@ export function CookieBanner() {
     return () => window.removeEventListener(OPEN_CONSENT_EVENT, reopen);
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      document.body.style.paddingBottom = '';
+      return;
+    }
+    const apply = () => {
+      const height = bannerRef.current?.offsetHeight ?? 0;
+      document.body.style.paddingBottom = height > 0 ? `${height}px` : '7rem';
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => {
+      window.removeEventListener('resize', apply);
+      document.body.style.paddingBottom = '';
+    };
+  }, [open]);
+
   if (!open) return null;
   const decide = (analytics: boolean) => {
     saveConsent(analytics);
@@ -25,6 +43,7 @@ export function CookieBanner() {
   };
   return (
     <div
+      ref={bannerRef}
       role="dialog"
       aria-live="polite"
       aria-label={t('title')}

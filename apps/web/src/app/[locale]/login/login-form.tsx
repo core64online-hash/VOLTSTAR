@@ -21,7 +21,10 @@ export function LoginForm() {
     setError(null);
     try {
       const res = await loginUser({ email, password });
-      saveToken(res.accessToken);
+      if (!saveToken(res.accessToken)) {
+        setError(t('errorGeneric'));
+        return;
+      }
       router.push(`/${locale}/account`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errorGeneric'));

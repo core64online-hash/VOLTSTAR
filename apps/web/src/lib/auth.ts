@@ -3,30 +3,79 @@ import { apiUrl } from './api';
 
 const TOKEN_KEY = 'voltstar_token';
 
-/** Зберігає access-токен у localStorage (ігнорує помилки приватного режиму). */
-export function saveToken(token: string): void {
+function usableToken(value: string | null | undefined): string | null {
+  if (!value || value === 'undefined') return null;
+  return value;
+}
+
+function readCookieToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${TOKEN_KEY}=`;
+  for (const part of document.cookie.split('; ')) {
+    if (!part.startsWith(prefix)) continue;
+    const raw = part.slice(prefix.length);
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return null;
+}
+
+function tokenCookie(value: string, maxAge: number): void {
+  if (typeof document === 'undefined') return;
+  const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${TOKEN_KEY}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+
+/** Зберігає access-токен у localStorage і first-party cookie. true лише якщо getToken() повертає той самий токен. */
+export function saveToken(token: string): boolean {
+  if (!usableToken(token)) return false;
   try {
     localStorage.setItem(TOKEN_KEY, token);
   } catch {
-    /* localStorage недоступний — ігноруємо */
+    /* localStorage недоступний — лишається cookie */
   }
+  try {
+    tokenCookie(token, 900);
+  } catch {
+    /* cookie недоступна */
+  }
+  return getToken() === token;
 }
 
-/** Повертає збережений токен або null. */
+/** Повертає збережений токен або null. Спочатку localStorage, потім cookie. */
 export function getToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    const stored = usableToken(localStorage.getItem(TOKEN_KEY));
+    if (stored) return stored;
   } catch {
-    return null;
+    /* localStorage недоступний */
   }
+  return usableToken(readCookieToken());
 }
 
-/** Видаляє токен (вихід). */
+/** Видаляє токен (вихід) з localStorage і cookie. */
 export function clearToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {
     /* ignore */
+  }
+  try {
+    tokenCookie('', 0);
+  } catch {
+    /* ignore */
+  }
+}
+
+export class AuthRequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AuthRequestError';
+    this.status = status;
   }
 }
 
@@ -69,7 +118,7 @@ export async function fetchMe(token: string): Promise<AuthUser> {
     headers: { authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw new AuthRequestError(await parseError(res), res.status);
   return res.json();
 }
 

@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Role, type AuthUser } from '@voltstar/types';
-import { clearToken, fetchMe, getToken } from '../../../lib/auth';
+import { AuthRequestError, clearToken, fetchMe, getToken } from '../../../lib/auth';
 import { MyData } from './my-data';
 import { MyOrders } from './my-orders';
 
 type State =
   | { status: 'loading' }
   | { status: 'anon' }
+  | { status: 'error'; message: string }
   | { status: 'ready'; user: AuthUser };
 
 export function AccountView() {
@@ -30,9 +31,17 @@ export function AccountView() {
     }
     fetchMe(token)
       .then((user) => setState({ status: 'ready', user }))
-      .catch(() => {
-        clearToken();
-        setState({ status: 'anon' });
+      .catch((err: unknown) => {
+        const status = err instanceof AuthRequestError ? err.status : undefined;
+        if (status === 401 || status === 403) {
+          clearToken();
+          setState({ status: 'anon' });
+          return;
+        }
+        setState({
+          status: 'error',
+          message: err instanceof Error ? err.message : '',
+        });
       });
   }, []);
 
@@ -43,6 +52,10 @@ export function AccountView() {
 
   if (state.status === 'loading') {
     return <p className="text-neutral-500">{t('profile.loading')}</p>;
+  }
+
+  if (state.status === 'error') {
+    return <p className="text-sm text-red-600">{state.message || t('errorGeneric')}</p>;
   }
 
   if (state.status === 'anon') {

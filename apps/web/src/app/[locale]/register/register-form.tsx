@@ -62,7 +62,10 @@ export function RegisterForm() {
           : undefined,
       };
       const res = await registerUser(input);
-      saveToken(res.accessToken);
+      if (!saveToken(res.accessToken)) {
+        setError(t('errorGeneric'));
+        return;
+      }
       router.push(`/${locale}/account`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errorGeneric'));
