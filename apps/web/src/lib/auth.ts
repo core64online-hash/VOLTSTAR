@@ -3,6 +3,9 @@ import { apiUrl } from './api';
 
 const TOKEN_KEY = 'voltstar_token';
 
+/** Токен поточної вкладки, якщо localStorage і cookie недоступні. */
+let memoryToken: string | null = null;
+
 function usableToken(value: string | null | undefined): string | null {
   if (!value || value === 'undefined') return null;
   return value;
@@ -29,24 +32,27 @@ function tokenCookie(value: string, maxAge: number): void {
   document.cookie = `${TOKEN_KEY}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
-/** Зберігає access-токен у localStorage і first-party cookie. true лише якщо getToken() повертає той самий токен. */
+/** Зберігає access-токен у памʼяті сторінки, localStorage і first-party cookie. true, якщо токен непорожній. */
 export function saveToken(token: string): boolean {
   if (!usableToken(token)) return false;
+  memoryToken = token;
   try {
     localStorage.setItem(TOKEN_KEY, token);
   } catch {
-    /* localStorage недоступний — лишається cookie */
+    /* localStorage недоступний — лишається cookie або памʼять */
   }
   try {
     tokenCookie(token, 900);
   } catch {
     /* cookie недоступна */
   }
-  return getToken() === token;
+  return true;
 }
 
-/** Повертає збережений токен або null. Спочатку localStorage, потім cookie. */
+/** Повертає збережений токен або null. Спочатку памʼять сторінки, потім localStorage, потім cookie. */
 export function getToken(): string | null {
+  const memory = usableToken(memoryToken);
+  if (memory) return memory;
   try {
     const stored = usableToken(localStorage.getItem(TOKEN_KEY));
     if (stored) return stored;
@@ -56,8 +62,9 @@ export function getToken(): string | null {
   return usableToken(readCookieToken());
 }
 
-/** Видаляє токен (вихід) з localStorage і cookie. */
+/** Видаляє токен (вихід) з памʼяті сторінки, localStorage і cookie. */
 export function clearToken(): void {
+  memoryToken = null;
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {
