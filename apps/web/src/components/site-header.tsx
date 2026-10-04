@@ -7,7 +7,7 @@ export function SiteHeader({ locale }: { locale: string }) {
       <div className="mx-auto flex max-w-5xl items-center px-4 py-2">
         <Link href={`/${locale}`} className="inline-flex">
           <img
-            src="/voltstar-logo.png"
+            src="/brand/voltstar-logo.png"
             alt="VOLTSTAR"
             width={320}
             height={192}

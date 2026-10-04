@@ -37,7 +37,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             '@type': 'Organization',
             name: SITE_NAME,
             url: SITE_URL,
-            logo: `${SITE_URL}/voltstar-logo.png`,
+            logo: `${SITE_URL}/brand/voltstar-logo.png`,
           },
           {
             '@context': 'https://schema.org',
