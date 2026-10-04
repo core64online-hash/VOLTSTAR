@@ -41,6 +41,11 @@
   "catalog": {
     "title": "Каталог стартерів і генераторів",
     "empty": "Товарів не знайдено. Переконайтеся, що API та база даних запущені й наповнені демо-даними (pnpm --filter @voltstar/api seed).",
+    "resultCount": "Знайдено: {count}",
+    "pageStatus": "Сторінка {page} з {pages}",
+    "previousPage": "Попередня",
+    "nextPage": "Наступна",
+    "pagination": "Сторінки каталогу",
     "inStock": "В наявності",
     "outOfStock": "Немає в наявності",
     "from": "від",

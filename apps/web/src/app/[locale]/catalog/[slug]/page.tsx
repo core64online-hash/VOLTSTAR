@@ -63,6 +63,9 @@ export default async function ProductPage({ params }: Params) {
       <article className="mt-4">
         <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{product.brand}</span>
         <h1 className="mt-1 text-3xl font-bold">{product.name}</h1>
+        {product.description ? (
+          <p className="mt-3 max-w-prose text-neutral-800">{product.description}</p>
+        ) : null}
 
         {product.images[0] && (
           // Зовнішні URL з адмінки; розміри задані, щоб не було зсуву макета.
@@ -172,6 +175,7 @@ function productJsonLd(product: Product, locale: string) {
       '@context': 'https://schema.org',
       '@type': 'Product',
       name: product.name,
+      ...(product.description ? { description: product.description } : {}),
       sku: product.slug,
       // mpn — стандартне поле schema.org для номера виробника; крос-номери йдуть як identifier,
       // щоб пошуковики зіставляли сторінку із запитом за будь-яким із них.

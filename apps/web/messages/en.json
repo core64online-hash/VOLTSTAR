@@ -41,6 +41,11 @@
   "catalog": {
     "title": "Starter and alternator catalog",
     "empty": "No products found. Make sure the API and database are running and seeded (pnpm --filter @voltstar/api seed).",
+    "resultCount": "Found: {count}",
+    "pageStatus": "Page {page} of {pages}",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "pagination": "Catalog pages",
     "inStock": "In stock",
     "outOfStock": "Out of stock",
     "from": "from",

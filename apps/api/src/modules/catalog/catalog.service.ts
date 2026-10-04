@@ -225,6 +225,7 @@ export class CatalogService {
       id: row.id,
       slug: row.slug,
       name: row.name,
+      description: row.description ?? null,
       brand: row.brand.name,
       categorySlug: row.category.slug,
       kind: row.kind,

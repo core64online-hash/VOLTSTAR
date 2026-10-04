@@ -45,6 +45,8 @@ export const ProductSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
+  /** Короткий опис з таблиці характеристик. Порожній, якщо його немає. */
+  description: z.string().nullable().optional(),
   brand: z.string(),
   categorySlug: z.string(),
   kind: PartKindSchema,

@@ -43,6 +43,10 @@ export default async function CatalogPage({
   const sp = await searchParams;
   const t = await getTranslations('catalog');
 
+  const requestedPage = Number.parseInt(str(sp.page) ?? '', 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
+  const perPage = 24;
+
   const filters = {
     q: str(sp.q),
     brand: str(sp.brand),
@@ -52,18 +56,25 @@ export default async function CatalogPage({
     machineModel: str(sp.machineModel),
     voltage: str(sp.voltage),
     inStock: str(sp.inStock),
-    perPage: '24',
+    page: String(page),
+    perPage: String(perPage),
   };
 
   let products: Product[] = [];
+  let total = 0;
   let facets: CatalogFacets = { brands: [], kinds: [], conditions: [], machineSegments: [] };
   try {
     const [list, f] = await Promise.all([fetchProducts(filters), fetchFacets()]);
     products = list.items;
+    total = list.total;
     facets = f;
   } catch {
     // API/БД недоступні — показуємо порожній стан і фільтри з енумів.
   }
+
+  const pageCount = total > 0 ? Math.ceil(total / perPage) : 0;
+  const showPager = pageCount > 1 || (page > 1 && pageCount > 0);
+  const prevTarget = page > pageCount && pageCount > 0 ? pageCount : page - 1;
 
   // Порожні фасети означають, що API не відповів: показуємо повний перелік із енумів,
   // щоб фільтри лишалися робочими.
@@ -201,6 +212,8 @@ export default async function CatalogPage({
         </div>
       </form>
 
+      <p className="mb-4 text-sm text-neutral-600">{t('resultCount', { count: total })}</p>
+
       {products.length === 0 ? (
         <p className="rounded-lg border border-dashed border-neutral-300 p-6 text-neutral-500">
           {t('empty')}
@@ -212,6 +225,72 @@ export default async function CatalogPage({
           ))}
         </div>
       )}
+
+      {showPager ? (
+        <nav aria-label={t('pagination')} className="mt-8 flex flex-wrap items-center justify-between gap-3 text-sm">
+          {page > 1 ? (
+            <Link
+              href={catalogHref(locale, filters, prevTarget)}
+              rel="prev"
+              className="rounded-lg border border-neutral-300 px-4 py-2 hover:bg-neutral-50"
+            >
+              {t('previousPage')}
+            </Link>
+          ) : (
+            <span aria-disabled="true" className="rounded-lg border border-neutral-200 px-4 py-2 text-neutral-400">
+              {t('previousPage')}
+            </span>
+          )}
+          <span className="text-neutral-700">{t('pageStatus', { page, pages: pageCount })}</span>
+          {page < pageCount ? (
+            <Link
+              href={catalogHref(locale, filters, page + 1)}
+              rel="next"
+              className="rounded-lg border border-neutral-300 px-4 py-2 hover:bg-neutral-50"
+            >
+              {t('nextPage')}
+            </Link>
+          ) : (
+            <span aria-disabled="true" className="rounded-lg border border-neutral-200 px-4 py-2 text-neutral-400">
+              {t('nextPage')}
+            </span>
+          )}
+        </nav>
+      ) : null}
     </main>
   );
+}
+
+/** Посилання на сторінку каталогу з тими самими фільтрами. perPage лишається 24 на сервері. */
+function catalogHref(
+  locale: string,
+  filters: {
+    q?: string;
+    brand?: string;
+    kind?: string;
+    condition?: string;
+    machineSegment?: string;
+    machineModel?: string;
+    voltage?: string;
+    inStock?: string;
+  },
+  page: number,
+) {
+  const qs = new URLSearchParams();
+  for (const key of [
+    'q',
+    'brand',
+    'kind',
+    'condition',
+    'machineSegment',
+    'machineModel',
+    'voltage',
+    'inStock',
+  ] as const) {
+    const value = filters[key];
+    if (value) qs.set(key, value);
+  }
+  if (page > 1) qs.set('page', String(page));
+  const query = qs.toString();
+  return `/${locale}/catalog${query ? `?${query}` : ''}`;
 }

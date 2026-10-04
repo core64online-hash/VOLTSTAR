@@ -15,13 +15,16 @@ export function ProductCard({ product, locale }: { product: Product; locale: str
   return (
     <Link
       href={`/${locale}/catalog/${product.slug}`}
-      className="flex flex-col rounded-xl border border-neutral-200 p-5 transition-shadow hover:shadow-md"
+      className="flex min-w-0 flex-col rounded-xl border border-neutral-200 p-5 transition-shadow hover:shadow-md"
     >
       <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
         {product.brand}
       </span>
       <span className="mt-1 text-lg font-semibold">{product.name}</span>
       <span className="mt-1 font-mono text-sm text-neutral-700">{product.partNumber}</span>
+      {product.description ? (
+        <span className="mt-2 block truncate text-sm text-neutral-600">{product.description}</span>
+      ) : null}
       <span className="mt-2 text-sm text-neutral-600">
         {t(`kinds.${product.kind}`)} · {t(`conditions.${product.condition}`)}
         {product.voltage ? ` · ${product.voltage} ${t('volt')}` : ''}

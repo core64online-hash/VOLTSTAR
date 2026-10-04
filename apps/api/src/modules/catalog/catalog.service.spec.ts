@@ -5,6 +5,7 @@ const row = (id: string, partNumberNorm = id.toUpperCase()) => ({
   id,
   slug: id,
   name: `Стартер ${id}`,
+  description: null,
   brand: { name: 'Bosch', slug: 'bosch' },
   category: { slug: 'startery' },
   specs: [],
