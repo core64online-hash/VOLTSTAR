@@ -88,9 +88,6 @@ export default async function CatalogPage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mt-2 mb-6 text-3xl font-bold">{t('title')}</h1>
 
       {/* Фасетні фільтри (GET-форма, без клієнтського JS) */}

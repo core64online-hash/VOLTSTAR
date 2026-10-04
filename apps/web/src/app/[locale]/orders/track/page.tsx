@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { NO_INDEX } from '../../../../lib/seo';
@@ -29,9 +28,6 @@ export default async function TrackOrderPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-12">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mt-2 text-3xl font-bold">{t('title')}</h1>
       <p className="mb-8 mt-2 text-neutral-600">{t('subtitle')}</p>
       <form action={`/${locale}/orders/track`} method="get" className="space-y-4">

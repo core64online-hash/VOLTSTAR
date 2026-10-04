@@ -30,9 +30,6 @@ export default async function MachinesPage({ params }: { params: Promise<{ local
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mt-2 text-3xl font-bold">{t('title')}</h1>
       <p className="mt-2 text-neutral-600">{t('subtitle')}</p>
 

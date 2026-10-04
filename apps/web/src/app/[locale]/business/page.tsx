@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { LeadSource } from '@voltstar/types';
 import { LeadForm } from '../../../components/lead-form';
@@ -20,9 +19,6 @@ export default async function BusinessPage({ params }: { params: Promise<{ local
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mt-2 text-3xl font-bold">{t('title')}</h1>
       <p className="mt-2 text-neutral-600">{t('subtitle')}</p>
       <ul className="my-6 grid gap-3 text-sm sm:grid-cols-3">

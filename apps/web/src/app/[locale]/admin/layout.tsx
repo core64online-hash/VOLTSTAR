@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { AdminShell } from './admin-shell';
 import { NO_INDEX } from '../../../lib/seo';
@@ -18,9 +17,6 @@ export default async function AdminLayout({
   const t = await getTranslations('admin');
   return (
     <main className="mx-auto max-w-7xl px-4 py-10">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mb-4 mt-2 text-3xl font-bold">{t('title')}</h1>
       <AdminShell>{children}</AdminShell>
     </main>

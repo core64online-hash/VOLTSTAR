@@ -6,6 +6,7 @@ import { routing, type Locale } from '../../i18n/routing';
 import { CookieBanner } from '../../components/cookie-banner';
 import { ErrorReporter } from '../../components/error-reporter';
 import { SiteFooter } from '../../components/site-footer';
+import { SiteHeader } from '../../components/site-header';
 import { SITE_NAME, SITE_URL } from '../../lib/seo';
 import '../globals.css';
 
@@ -55,6 +56,7 @@ export default async function LocaleLayout({
           >
             {tA11y('skipToContent')}
           </a>
+          <SiteHeader locale={locale} />
           <div id="content" tabIndex={-1} className="outline-none">
             {children}
           </div>

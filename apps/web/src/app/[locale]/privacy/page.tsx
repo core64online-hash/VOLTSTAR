@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { pageMetadata } from '../../../lib/seo';
 import { policy } from './content';
@@ -27,9 +26,6 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
   const doc = policy(locale, legal);
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
-      <Link href={`/${locale}`} className="text-sm text-neutral-500 hover:underline">
-        VOLTSTAR
-      </Link>
       <h1 className="mt-2 text-3xl font-bold">{doc.title}</h1>
       <p className="mt-3 text-neutral-600">{doc.intro}</p>
       <nav aria-label={doc.title} className="mt-6 rounded-xl bg-neutral-50 p-4 text-sm">
